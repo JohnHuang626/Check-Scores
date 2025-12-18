@@ -209,6 +209,7 @@ export default function App() {
         setConnectionStatus("error");
       }
     } else {
+      // 若無 DB 連線，確認是否需要維持 Demo 狀態
       setConnectionStatus("demo");
     }
   }, []);
@@ -424,7 +425,7 @@ export default function App() {
   const handleDownloadGradeTemplate = () => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     const BOM = "\uFEFF"; 
-    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民" : "座號,姓名,國文,英語,數學,自然,地理,歷史,公民";
+    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民" : "座號,姓名,國文,英語,數學,自然,社會";
     let example = currentCategory === 'regular' ? "6,王小明,80,85,90,88,85,82,88" : "6,王小明,A++,A,B++,A+,B";
     const csvContent = BOM + headers + "\n" + example;
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -558,7 +559,7 @@ export default function App() {
 
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">{teacherProfile.className} 成績查詢系統</h1>
-            <p className="text-gray-500">親師互動平台</p>
+            <p className="text-gray-500"></p>
           </div>
           <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
             <button className={`flex-1 py-2 rounded-md transition-all ${userRole === 'parent' ? 'bg-white text-blue-600 shadow' : 'text-gray-500'}`} onClick={() => setUserRole('parent')}>我是家長</button>
@@ -566,12 +567,27 @@ export default function App() {
           </div>
           <form onSubmit={(e) => { e.preventDefault(); handleLogin(userRole, e.target.account.value, e.target.password.value); }} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">帳號</label>
-              <input name="account" className="w-full border rounded-lg p-3 mt-1 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="請輸入您的帳號" />
+              <label className="text-sm font-medium text-gray-700">
+                帳號
+                {userRole === 'parent' && <span className="text-gray-500 text-xs font-normal ml-2">(請輸入學號)</span>}
+              </label>
+              <input 
+                name="account" 
+                className="w-full border rounded-lg p-3 mt-1 focus:ring-2 focus:ring-blue-500 focus:outline-none" 
+                placeholder={userRole === 'parent' ? "請輸入學號" : "請輸入您的帳號"} 
+              />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">密碼</label>
-              <input name="password" type="password" className="w-full border rounded-lg p-3 mt-1 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="請輸入您的密碼" />
+              <label className="text-sm font-medium text-gray-700">
+                密碼
+                {userRole === 'parent' && <span className="text-gray-500 text-xs font-normal ml-2">(請輸入學生身分證後4碼)</span>}
+              </label>
+              <input 
+                name="password" 
+                type="password" 
+                className="w-full border rounded-lg p-3 mt-1 focus:ring-2 focus:ring-blue-500 focus:outline-none" 
+                placeholder={userRole === 'parent' ? "請輸入學生身分證後4碼" : "請輸入您的密碼"} 
+              />
             </div>
             <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">登入</button>
           </form>
@@ -599,6 +615,7 @@ export default function App() {
     );
   }
 
+  // --- Main Layout ---
   const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId);
 
   return (
