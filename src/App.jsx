@@ -96,7 +96,6 @@ const generateExamOptions = () => {
 const EXAM_OPTIONS = generateExamOptions();
 
 // --- Helper Components ---
-// 修正：將 SortableHeader 移至 App 外部，防止重新渲染導致的崩潰
 const SortableHeader = ({ label, sortKey, className = "", sortConfig, onSort }) => (
   <th 
     className={`p-3 cursor-pointer hover:bg-gray-200 select-none transition-colors ${className}`}
@@ -594,6 +593,8 @@ export default function App() {
   }
 
   // --- Main Layout ---
+  const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId); // 修正：在 return 之前定義此變數
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
       <div className="md:hidden bg-blue-600 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
