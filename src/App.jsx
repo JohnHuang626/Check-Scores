@@ -261,6 +261,13 @@ export default function App() {
   };
 
   // --- Helper Functions ---
+  
+  // 新增：處理導覽點擊，自動關閉選單
+  const handleNavClick = (tab) => {
+    setActiveTab(tab);
+    setShowMenu(false); // 手機版點擊後自動縮回側邊欄
+  };
+
   const getCurrentExamCategory = (examId) => {
     const exam = EXAM_OPTIONS.find(e => e.id === examId);
     return exam ? exam.category : 'regular';
@@ -417,7 +424,7 @@ export default function App() {
   const handleDownloadGradeTemplate = () => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     const BOM = "\uFEFF"; 
-    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民" : "座號,姓名,國文,英語,數學,自然,社會";
+    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民" : "座號,姓名,國文,英語,數學,自然,地理,歷史,公民";
     let example = currentCategory === 'regular' ? "6,王小明,80,85,90,88,85,82,88" : "6,王小明,A++,A,B++,A+,B";
     const csvContent = BOM + headers + "\n" + example;
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -592,8 +599,7 @@ export default function App() {
     );
   }
 
-  // --- Main Layout ---
-  const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId); // 修正：在 return 之前定義此變數
+  const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
@@ -610,14 +616,14 @@ export default function App() {
         <nav className="flex-1 p-4 space-y-2">
           {userRole === 'teacher' ? (
             <>
-              <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Monitor size={20}/><span>教師控制台</span></button>
-              <button onClick={() => setActiveTab('settings')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Settings size={20}/><span>班級設定</span></button>
-              <button onClick={() => setActiveTab('students')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'students' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Users size={20}/><span>學生資料管理</span></button>
-              <button onClick={() => setActiveTab('grades')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'grades' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Edit size={20}/><span>成績登錄管理</span></button>
+              <button onClick={() => handleNavClick('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Monitor size={20}/><span>教師控制台</span></button>
+              <button onClick={() => handleNavClick('settings')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Settings size={20}/><span>班級設定</span></button>
+              <button onClick={() => handleNavClick('students')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'students' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Users size={20}/><span>學生資料管理</span></button>
+              <button onClick={() => handleNavClick('grades')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'grades' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Edit size={20}/><span>成績登錄管理</span></button>
             </>
           ) : (
             <>
-              <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><TrendingUp size={20}/><span>成績分析總覽</span></button>
+              <button onClick={() => handleNavClick('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><TrendingUp size={20}/><span>成績分析總覽</span></button>
             </>
           )}
         </nav>
@@ -871,10 +877,10 @@ export default function App() {
                </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <button onClick={() => setActiveTab('students')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
+              <button onClick={() => handleNavClick('students')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
                  <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-blue-50 rounded-lg"><Users className="w-8 h-8 text-blue-600"/></div><h3 className="font-bold text-gray-800 text-lg">學生資料管理</h3></div><p className="text-sm text-gray-500">設定學生名單、帳號與密碼，支援批次匯入。</p>
               </button>
-              <button onClick={() => setActiveTab('grades')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
+              <button onClick={() => handleNavClick('grades')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
                  <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-green-50 rounded-lg"><Edit className="w-8 h-8 text-green-600"/></div><h3 className="font-bold text-gray-800 text-lg">成績登錄管理</h3></div><p className="text-sm text-gray-500">支援段考(百分制)與模考(會考積分制)輸入，提供批次匯入功能。</p>
               </button>
             </div>
