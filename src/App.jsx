@@ -231,6 +231,38 @@ export default function App() {
   const [sortConfig, setSortConfig] = useState({ key: 'seat', direction: 'asc' });
   const [parentExamId, setParentExamId] = useState("7-1-reg-0"); 
 
+  // --- Vercel Toolbar Blocker ---
+  useEffect(() => {
+    // 建立 style 元素來強制隱藏 Vercel Toolbar 及相關元件
+    const style = document.createElement('style');
+    style.textContent = `
+      /* 隱藏 Vercel Toolbar */
+      vercel-live-feedback,
+      #vercel-toolbar,
+      vercel-toolbar,
+      [data-testid="vercel-toolbar"],
+      div[class*="vercel-toolbar"],
+      [class*="vercel-toast"] {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+        z-index: -9999 !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      // 組件卸載時移除
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, []);
+
   // --- Sync Effects ---
   useEffect(() => {
     if (db) {
@@ -246,7 +278,7 @@ export default function App() {
              setConnectionStatus("connected");
           }
         }, (err) => { 
-            console.warn("Firebase 連線失敗，切換回單機模式"); 
+            console.warn("Using Mock Data (Students)", err); 
             setConnectionStatus("error"); 
             setStudents(MOCK_STUDENTS);
         });
@@ -491,17 +523,6 @@ export default function App() {
     return (
       <div className="min-h-screen bg-blue-50 flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md relative">
-          {/* 隱藏 Vercel 工具列 (右下角彈窗) */}
-          <style>{`
-            vercel-live-feedback, 
-            #vercel-toolbar, 
-            vercel-toolbar {
-              display: none !important;
-              opacity: 0 !important;
-              pointer-events: none !important;
-              visibility: hidden !important;
-            }
-          `}</style>
            <div className={`absolute top-4 right-4 text-xs font-bold px-2 py-1 rounded-full flex items-center ${
             connectionStatus === 'connected' ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
             <Database size={12} className="mr-1"/> {connectionStatus==='connected'?'雲端已連線':'演示模式'}
