@@ -9,7 +9,7 @@ import {
   XCircle, Edit, Printer, Save, ArrowUpDown, ArrowUp, ArrowDown,
   Plus, Trash2, Key, BarChart2, Search, Download, Upload,
   School, Monitor, FileSpreadsheet, Settings, Database, AlertCircle, CloudOff,
-  LineChart
+  LineChart, Trophy
 } from 'lucide-react';
 
 // !!!!!!!!!!!!! 重要設定 !!!!!!!!!!!!!
@@ -28,14 +28,13 @@ let app;
 let db;
 
 try {
-  if (firebaseConfig.apiKey) {
+  if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 0) {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
   } else {
     console.log("未偵測到 Firebase Config，將啟動演示模式 (Demo Mode)");
   }
 } catch (error) {
-  // 改用 warn 避免 Vercel 彈窗
   console.warn("Firebase 初始化跳過:", error);
 }
 
@@ -78,7 +77,6 @@ const DEFAULT_TEACHER = {
 const CAP_POINTS = { "A++": 7, "A+": 6, "A": 5, "B++": 4, "B+": 3, "B": 2, "C": 1 };
 const CAP_OPTIONS = ["A++", "A+", "A", "B++", "B+", "B", "C"];
 
-// 修改：加入 group 屬性以便在選單中分區
 const generateExamOptions = () => {
   const grades = ['七年級', '八年級', '九年級'];
   const semesters = ['上學期', '下學期'];
@@ -91,7 +89,6 @@ const generateExamOptions = () => {
   
   grades.forEach((g, gIdx) => {
     semesters.forEach((s, sIdx) => {
-      // 1. 段考 (Regular) -> 放入 regularOptions
       regularExams.forEach((e, eIdx) => {
         regularOptions.push({
           id: `${gIdx+7}-${sIdx+1}-reg-${eIdx}`, 
@@ -100,8 +97,6 @@ const generateExamOptions = () => {
           group: `【段考】${g} ${s}`
         });
       });
-
-      // 2. 複習考 (Review) -> 放入 otherOptions
       reviewExams.forEach((e, eIdx) => {
         otherOptions.push({
           id: `${gIdx+7}-${sIdx+1}-rev-${eIdx}`, 
@@ -110,8 +105,6 @@ const generateExamOptions = () => {
           group: `【模擬/複習】${g} ${s}`
         });
       });
-
-      // 3. 模擬考 (Mock) -> 放入 otherOptions
       if (g === '九年級') {
         mockExams.forEach((m, mIdx) => {
            otherOptions.push({
@@ -124,13 +117,10 @@ const generateExamOptions = () => {
       }
     });
   });
-  
-  // 回傳順序：先段考，後模考
   return [...regularOptions, ...otherOptions];
 };
 const EXAM_OPTIONS = generateExamOptions();
 
-// 預先處理分組，供 Render 使用
 const EXAM_GROUPS = EXAM_OPTIONS.reduce((groups, opt) => {
   const lastGroup = groups[groups.length - 1];
   if (lastGroup && lastGroup.label === opt.group) {
@@ -199,18 +189,30 @@ const ComparisonBar = ({ subject, myScore, avgScore, maxScore = 100, isCap = fal
   );
 };
 
-const TrendChart = ({ data, title }) => {
+// 更新 TrendChart 支援反轉 (reverse) 模式，用於排名顯示
+const TrendChart = ({ data, title, reverse = false }) => {
   if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4 text-center bg-gray-50 rounded-lg">尚無足夠數據繪製趨勢圖 (需至少一次考試成績)</div>;
   
   const scores = data.map(d => d.score);
   const maxVal = Math.max(...scores);
-  const isRegularTotal = maxVal > 35; 
   
   const height = 150;
   const width = 300;
   const padding = 20;
-  const maxScore = isRegularTotal ? 500 : 35;
-  const minScore = 0;
+  
+  let minScore = 0;
+  let maxScore = 100;
+
+  if (reverse) {
+    // 排名模式：1 是最好的，放上面
+    minScore = 1;
+    maxScore = Math.max(...scores, 5); // 確保圖表不會太扁，至少顯示到第5名或更低
+  } else {
+    // 分數模式
+    const isRegularTotal = maxVal > 35;
+    maxScore = isRegularTotal ? 500 : 35;
+    minScore = 0;
+  }
   
   const getX = (index) => {
     const count = data.length > 1 ? data.length - 1 : 1;
@@ -218,25 +220,38 @@ const TrendChart = ({ data, title }) => {
     return padding + (index * ((width - padding * 2) / (data.length - 1)));
   };
   
-  const getY = (score) => height - padding - ((score - minScore) / (maxScore - minScore)) * (height - padding * 2);
+  const getY = (val) => {
+    if (reverse) {
+        // 反轉模式：值越小 (1) 越靠上 (padding)，值越大 (maxScore) 越靠下
+        return padding + ((val - minScore) / (maxScore - minScore)) * (height - 2 * padding);
+    } else {
+        // 一般模式：值越大 (maxScore) 越靠上 (padding)
+        return height - padding - ((val - minScore) / (maxScore - minScore)) * (height - 2 * padding);
+    }
+  };
   
   const points = data.length > 1 
     ? data.map((d, i) => `${getX(i)},${getY(d.score)}`).join(' ') 
     : "";
 
+  const lineColor = reverse ? "#f59e0b" : "#2563eb"; // 排名用橘色，分數用藍色
+
   return (
     <div className="w-full overflow-x-auto">
-      <h4 className="text-sm font-bold text-gray-600 mb-2">{title}</h4>
+      <h4 className="text-sm font-bold text-gray-600 mb-2 flex items-center">
+        {title}
+        {reverse && <span className="ml-2 text-xs text-gray-400 font-normal">(越低越好)</span>}
+      </h4>
       <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="bg-white rounded-lg border border-gray-100" style={{ overflow: 'visible' }}>
         {[0, 0.25, 0.5, 0.75, 1].map(r => (
            <line key={r} x1={padding} y1={height - padding - r*(height-2*padding)} x2={width-padding} y2={height - padding - r*(height-2*padding)} stroke="#eee" strokeWidth="1" />
         ))}
         {data.length > 1 && (
-          <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="3" />
+          <polyline points={points} fill="none" stroke={lineColor} strokeWidth="3" />
         )}
         {data.map((d, i) => (
           <g key={i}>
-            <circle cx={getX(i)} cy={getY(d.score)} r="5" fill="#2563eb" />
+            <circle cx={getX(i)} cy={getY(d.score)} r="5" fill={lineColor} />
             <text x={getX(i)} y={getY(d.score) - 10} textAnchor="middle" fontSize="12" fill="#4b5563" fontWeight="bold">{d.score}</text>
             <text x={getX(i)} y={height - 5} textAnchor="middle" fontSize="10" fill="#9ca3af">{d.examLabel.split(' ').pop()}</text>
           </g>
@@ -390,13 +405,9 @@ export default function App() {
         setCurrentUser(student);
         setIsLoggedIn(true);
         setActiveTab('dashboard');
-        
-        // 修正：家長登入後，預先載入最新一次「段考」成績
         const regularExamIds = EXAM_OPTIONS.filter(opt => opt.category === 'regular').map(opt => opt.id);
         const lastRegularExamId = [...regularExamIds].reverse().find(eid => gradesDB[eid] && gradesDB[eid][student.id]);
-        if (lastRegularExamId) {
-            setParentExamId(lastRegularExamId);
-        }
+        if (lastRegularExamId) { setParentExamId(lastRegularExamId); }
       } else { alert("學生帳號錯誤 (s11204/123)"); }
     }
   };
@@ -406,12 +417,12 @@ export default function App() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const newProfile = { ...teacherProfile, className: formData.get('className'), name: formData.get('name') };
-    if(db) await setDoc(doc(db, "meta", "teacherProfile"), newProfile);
+    if(db && connectionStatus === 'connected') await setDoc(doc(db, "meta", "teacherProfile"), newProfile);
     else setTeacherProfile(newProfile);
     alert("更新成功");
   };
   const handleUpdateStudent = async () => {
-    if(db) {
+    if(db && connectionStatus === 'connected') {
         if (editingStudentId === 'new') {
           const newStudentRef = doc(collection(db, "students")); 
           await setDoc(newStudentRef, { ...tempStudentData, id: newStudentRef.id });
@@ -429,7 +440,7 @@ export default function App() {
   };
   const handleDeleteStudent = async (id) => {
     if (confirm("確定要刪除這位學生嗎？")) {
-      if(db) await deleteDoc(doc(db, "students", id));
+      if(db && connectionStatus === 'connected') await deleteDoc(doc(db, "students", id));
       else setStudents(students.filter(s => s.id !== id));
     }
   };
@@ -438,7 +449,7 @@ export default function App() {
     let finalValue = value;
     if (currentCategory === 'regular') finalValue = Number(value);
     
-    if(db) {
+    if(db && connectionStatus === 'connected') {
         await setDoc(doc(db, "grades", teacherExamId), {
             [studentId]: { ...(gradesDB[teacherExamId]?.[studentId] || {}), [subject]: finalValue }
         }, { merge: true });
@@ -490,7 +501,7 @@ export default function App() {
              const account = parts[2].trim();
              const password = parts[3].trim(); 
              if (!isNaN(seat) && name && account) {
-               if(db) {
+               if(db && connectionStatus === 'connected') {
                  const newStudentRef = doc(collection(db, "students"));
                  await setDoc(newStudentRef, { id: newStudentRef.id, seat, name, account, password: password || "123" });
                } else {
@@ -557,7 +568,7 @@ export default function App() {
           }
         }
         if (count > 0) {
-           if(db) await setDoc(doc(db, "grades", teacherExamId), updates, { merge: true });
+           if(db && connectionStatus === 'connected') await setDoc(doc(db, "grades", teacherExamId), updates, { merge: true });
            else setGradesDB(prev => ({ ...prev, [teacherExamId]: { ...prev[teacherExamId], ...updates } }));
            alert(`成功匯入 ${count} 筆成績！`);
         }
@@ -643,6 +654,7 @@ export default function App() {
     };
   }, [currentUser, parentExamId, gradesDB, students]);
 
+  // 分數走勢
   const trendData = useMemo(() => {
     if (!currentUser || userRole !== 'parent') return [];
     const currentCat = getCurrentExamCategory(parentExamId);
@@ -653,6 +665,28 @@ export default function App() {
       return { examLabel: opt.label, score: parseFloat(total) };
     });
   }, [currentUser, gradesDB, parentExamId]);
+
+  // 排名走勢
+  const rankTrendData = useMemo(() => {
+    if (!currentUser || userRole !== 'parent') return [];
+    const currentCat = getCurrentExamCategory(parentExamId);
+    const availableExams = EXAM_OPTIONS.filter(opt => gradesDB[opt.id] && gradesDB[opt.id][currentUser.id] && opt.category === currentCat);
+    
+    return availableExams.map(opt => {
+      const examGrades = gradesDB[opt.id] || {};
+      const myStats = calculateStats(examGrades[currentUser.id], opt.category);
+      const myTotal = myStats.total;
+
+      const allTotals = students.map(s => {
+        const sScores = examGrades[s.id];
+        if (!sScores) return -1;
+        return calculateStats(sScores, opt.category).total;
+      }).sort((a, b) => b - a);
+
+      const rank = allTotals.indexOf(myTotal) + 1;
+      return { examLabel: opt.label, score: rank };
+    });
+  }, [currentUser, gradesDB, parentExamId, students]);
 
   const teacherTableData = useMemo(() => {
     if (userRole !== 'teacher') return [];
@@ -712,17 +746,6 @@ export default function App() {
       </div>
     );
   }
-  
-  // Create grouped options for the select input
-  const EXAM_GROUPS = EXAM_OPTIONS.reduce((groups, opt) => {
-    const lastGroup = groups[groups.length - 1];
-    if (lastGroup && lastGroup.label === opt.group) {
-      lastGroup.options.push(opt);
-    } else {
-      groups.push({ label: opt.group, options: [opt] });
-    }
-    return groups;
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
@@ -766,7 +789,7 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-            {/* Statistics Table Only (No Trend Chart) */}
+            {/* 只有表格，沒有走勢圖 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -807,7 +830,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ... (Settings, Students, Dashboard tabs remain unchanged) ... */}
+        {/* ... (Settings, Students tabs - omitted for brevity, using same components) ... */}
         {userRole === 'teacher' && activeTab === 'settings' && (
           <div className="max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Settings className="mr-2 text-blue-600"/> 班級與導師設定</h2>
@@ -825,7 +848,7 @@ export default function App() {
           <div className="max-w-5xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Users className="mr-2 text-blue-600"/> 學生資料與帳號管理</h2>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-               <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <span className="font-bold text-gray-700">學生列表 ({students.length}人)</span>
                 <div className="flex gap-2">
                    <button onClick={handleDownloadStudentTemplate} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-gray-200"><Download size={16} className="mr-1"/> 下載範本</button>
@@ -860,28 +883,17 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TEACHER: GRADE MANAGEMENT (Updated Footer) ================= */}
+        {/* ================= TEACHER: GRADE MANAGEMENT ================= */}
         {userRole === 'teacher' && activeTab === 'grades' && (
           <div className="w-full space-y-4">
+            {/* Same Grade Management Logic ... */}
             <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 print:hidden">
                <div className="flex items-center space-x-4 w-full md:w-auto">
                  <div className="p-2 bg-blue-100 rounded-lg"><BookOpen className="text-blue-600"/></div>
                  <div className="w-full">
                    <label className="block text-xs text-gray-500 font-bold mb-1">選擇考試場次</label>
-                   <select 
-                     className="w-full md:w-64 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-blue-500"
-                     value={teacherExamId}
-                     onChange={(e) => setTeacherExamId(e.target.value)}
-                   >
-                     {EXAM_GROUPS.map(group => (
-                        <optgroup label={group.label} key={group.label}>
-                          {group.options.map(opt => (
-                            <option key={opt.id} value={opt.id}>
-                              {opt.label.split(' ').pop()} {opt.category === 'cap' ? '(積分)' : ''}
-                            </option>
-                          ))}
-                        </optgroup>
-                     ))}
+                   <select className="w-full md:w-64 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-blue-500" value={teacherExamId} onChange={(e) => setTeacherExamId(e.target.value)}>
+                     {EXAM_GROUPS.map(group => (<optgroup label={group.label} key={group.label}>{group.options.map(opt => (<option key={opt.id} value={opt.id}>{opt.label.split(' ').pop()} {opt.category === 'cap' ? '(積分)' : ''}</option>))}</optgroup>))}
                    </select>
                  </div>
                </div>
@@ -928,7 +940,6 @@ export default function App() {
                       <tr key={student.id} className="hover:bg-gray-50">
                         <td className="p-3 text-center text-gray-600">{student.seat}</td>
                         <td className="p-3 font-medium text-gray-800">{student.name}</td>
-                        {/* Input Fields */}
                         {(currentTeacherExamCategory === 'regular' ? ['chi', 'eng', 'math', 'sci', 'geo', 'his', 'civ'] : ['chi', 'eng', 'math', 'sci', 'soc']).map(sub => (
                           <td key={sub} className="p-1">
                             {currentTeacherExamCategory === 'regular' ? (
@@ -1010,13 +1021,12 @@ export default function App() {
               </div>
             </div>
             
-            {/* ... Summary Cards (RESTORED TREND CHART) ... */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 relative overflow-hidden">
                   <div className="relative z-10">
                     <p className="text-blue-100 text-sm">{currentExamData.category === 'regular' ? '本次總分' : '會考總積分'}</p>
                     <h3 className="text-5xl font-bold mt-2">{currentExamData.myScores.total}</h3>
-                    {/* 放大班排顯示 */}
                     <div className="mt-4 flex items-baseline space-x-2">
                       <span className="bg-white/20 px-3 py-1 rounded-lg text-2xl font-bold">班排 #{currentExamData.rank}</span>
                       <span className="text-sm text-blue-100">/ {currentExamData.totalStudents} 人</span>
@@ -1031,7 +1041,6 @@ export default function App() {
                        <span className="text-gray-600 text-sm">班級平均</span>
                        <span className="font-bold text-gray-800 text-2xl">{currentExamData.avgTotal}</span>
                     </div>
-                    {/* 恢復：與平均的差距 */}
                     <div className="flex justify-between items-center border-t pt-4">
                        <span className="text-gray-600 text-sm">與平均差距</span>
                        <span className={`font-bold text-xl ${currentExamData.myScores.total >= currentExamData.avgTotal ? 'text-green-500' : 'text-red-500'}`}>
@@ -1041,10 +1050,16 @@ export default function App() {
                     </div>
                   </div>
                </div>
-               {/* 恢復：走勢圖 (TrendChart) - 請將此行加回以顯示圖表 */}
-               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                 <TrendChart data={trendData} title={currentExamData.category==='regular' ? "我的段考總分走勢" : "我的模考積分走勢"} />
-               </div>
+            </div>
+
+            {/* Charts: Score Trend & Rank Trend */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <TrendChart data={trendData} title={currentExamData.category==='regular' ? "我的段考總分走勢" : "我的模考積分走勢"} />
+                </div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <TrendChart data={rankTrendData} title="我的班排走勢" reverse={true} />
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1069,7 +1084,6 @@ export default function App() {
                         </tr>
                       ))}
                    </tbody>
-                   {/* Parent View Footer: Class Average */}
                    <tfoot className="bg-gray-50 border-t">
                       <tr>
                         <td className="p-3 font-bold text-gray-600">班級平均</td>
@@ -1089,7 +1103,6 @@ export default function App() {
                 <h1 className="text-3xl font-bold mb-2">{teacherProfile.className} 班級管理</h1>
                 <div className="text-sm">學生人數: {students.length}</div>
              </div>
-             {/* ... Buttons ... */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <button onClick={() => handleNavClick('stats')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
                  <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-purple-50 rounded-lg"><LineChart className="w-8 h-8 text-purple-600"/></div><h3 className="font-bold text-gray-800 text-lg">班級各次段考平均</h3></div><p className="text-sm text-gray-500">查看班級歷史成績統計分析。</p>
