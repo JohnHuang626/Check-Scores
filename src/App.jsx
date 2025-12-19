@@ -78,7 +78,7 @@ const DEFAULT_TEACHER = {
 const CAP_POINTS = { "A++": 7, "A+": 6, "A": 5, "B++": 4, "B+": 3, "B": 2, "C": 1 };
 const CAP_OPTIONS = ["A++", "A+", "A", "B++", "B+", "B", "C"];
 
-// 修改：將考試選單分為「段考」與「模擬考」兩大類，並將段考排在前面
+// 修改：加入 group 屬性以便在選單中分區
 const generateExamOptions = () => {
   const grades = ['七年級', '八年級', '九年級'];
   const semesters = ['上學期', '下學期'];
@@ -96,7 +96,8 @@ const generateExamOptions = () => {
         regularOptions.push({
           id: `${gIdx+7}-${sIdx+1}-reg-${eIdx}`, 
           label: `${g} ${s} ${e}`,
-          category: 'regular'
+          category: 'regular',
+          group: `【段考】${g} ${s}`
         });
       });
 
@@ -105,7 +106,8 @@ const generateExamOptions = () => {
         otherOptions.push({
           id: `${gIdx+7}-${sIdx+1}-rev-${eIdx}`, 
           label: `${g} ${s} ${e}`,
-          category: 'cap'
+          category: 'cap',
+          group: `【模擬/複習】${g} ${s}`
         });
       });
 
@@ -115,7 +117,8 @@ const generateExamOptions = () => {
            otherOptions.push({
             id: `9-${sIdx+1}-mock-${mIdx}`, 
             label: `${g} ${s} ${m}`,
-            category: 'cap'
+            category: 'cap',
+            group: `【模擬/複習】${g} ${s}`
           });
         });
       }
@@ -126,6 +129,17 @@ const generateExamOptions = () => {
   return [...regularOptions, ...otherOptions];
 };
 const EXAM_OPTIONS = generateExamOptions();
+
+// 預先處理分組，供 Render 使用
+const EXAM_GROUPS = EXAM_OPTIONS.reduce((groups, opt) => {
+  const lastGroup = groups[groups.length - 1];
+  if (lastGroup && lastGroup.label === opt.group) {
+    lastGroup.options.push(opt);
+  } else {
+    groups.push({ label: opt.group, options: [opt] });
+  }
+  return groups;
+}, []);
 
 // --- Helper Functions ---
 const getCurrentExamCategory = (examId) => {
@@ -378,14 +392,8 @@ export default function App() {
         setActiveTab('dashboard');
         
         // 修正：家長登入後，預先載入最新一次「段考」成績
-        // 1. 篩選出所有 category 為 'regular' 的考試 ID
         const regularExamIds = EXAM_OPTIONS.filter(opt => opt.category === 'regular').map(opt => opt.id);
-        
-        // 2. 找到最後一次有成績的段考
-        // 反轉 regularExamIds 以從最新開始找，並確認該學生在 gradesDB 對應的 ID 中有分數
         const lastRegularExamId = [...regularExamIds].reverse().find(eid => gradesDB[eid] && gradesDB[eid][student.id]);
-        
-        // 3. 如果有找到，設定為預設；否則保持預設值 (通常是第一個段考)
         if (lastRegularExamId) {
             setParentExamId(lastRegularExamId);
         }
@@ -704,6 +712,17 @@ export default function App() {
       </div>
     );
   }
+  
+  // Create grouped options for the select input
+  const EXAM_GROUPS = EXAM_OPTIONS.reduce((groups, opt) => {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.label === opt.group) {
+      lastGroup.options.push(opt);
+    } else {
+      groups.push({ label: opt.group, options: [opt] });
+    }
+    return groups;
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
@@ -849,8 +868,20 @@ export default function App() {
                  <div className="p-2 bg-blue-100 rounded-lg"><BookOpen className="text-blue-600"/></div>
                  <div className="w-full">
                    <label className="block text-xs text-gray-500 font-bold mb-1">選擇考試場次</label>
-                   <select className="w-full md:w-64 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-blue-500" value={teacherExamId} onChange={(e) => setTeacherExamId(e.target.value)}>
-                     {EXAM_OPTIONS.map(opt => (<option key={opt.id} value={opt.id}>{opt.label} {opt.category === 'cap' ? '(積分制)' : '(百分制)'}</option>))}
+                   <select 
+                     className="w-full md:w-64 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-blue-500"
+                     value={teacherExamId}
+                     onChange={(e) => setTeacherExamId(e.target.value)}
+                   >
+                     {EXAM_GROUPS.map(group => (
+                        <optgroup label={group.label} key={group.label}>
+                          {group.options.map(opt => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label.split(' ').pop()} {opt.category === 'cap' ? '(積分)' : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                     ))}
                    </select>
                  </div>
                </div>
@@ -966,7 +997,15 @@ export default function App() {
               <div className="flex items-center space-x-3">
                  <Calendar className="text-blue-600"/>
                  <select value={parentExamId} onChange={(e) => setParentExamId(e.target.value)} className="bg-transparent font-bold text-gray-700 focus:outline-none cursor-pointer">
-                   {EXAM_OPTIONS.map(opt => <option key={opt.id} value={opt.id}>{opt.label} {opt.category==='cap'?'(模考)':'(段考)'}</option>)}
+                   {EXAM_GROUPS.map(group => (
+                        <optgroup label={group.label} key={group.label}>
+                          {group.options.map(opt => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label.split(' ').pop()} {opt.category === 'cap' ? '(模考)' : '(段考)'}
+                            </option>
+                          ))}
+                        </optgroup>
+                   ))}
                  </select>
               </div>
             </div>
