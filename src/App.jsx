@@ -9,7 +9,7 @@ import {
   XCircle, Edit, Printer, Save, ArrowUpDown, ArrowUp, ArrowDown,
   Plus, Trash2, Key, BarChart2, Search, Download, Upload,
   School, Monitor, FileSpreadsheet, Settings, Database, AlertCircle, CloudOff,
-  LineChart, PieChart
+  LineChart
 } from 'lucide-react';
 
 // !!!!!!!!!!!!! 重要設定 !!!!!!!!!!!!!
@@ -38,7 +38,7 @@ try {
   console.error("Firebase 初始化失敗:", error);
 }
 
-// --- 備用模擬資料 (擴充為三次考試，以顯示走勢) ---
+// --- 備用模擬資料 (單機演示模式用) ---
 const MOCK_STUDENTS = [
   { id: "1", seat: 1, name: "範例王大明", account: "s11201", password: "123" },
   { id: "2", seat: 2, name: "範例林小美", account: "s11202", password: "123" },
@@ -48,17 +48,17 @@ const MOCK_STUDENTS = [
 ];
 
 const MOCK_GRADES = {
-  "7-1-reg-0": { // 第一次段考
+  "7-1-reg-0": { 
     "4": { chi: 80, eng: 85, math: 70, sci: 75, geo: 80, his: 82, civ: 80 }, 
     "1": { chi: 85, eng: 88, math: 80, sci: 82, geo: 85, his: 85, civ: 85 }, 
     "2": { chi: 90, eng: 92, math: 95, sci: 90, geo: 90, his: 90, civ: 90 },
   },
-  "7-1-reg-1": { // 第二次段考 (成績進步)
+  "7-1-reg-1": { 
     "4": { chi: 85, eng: 90, math: 75, sci: 80, geo: 85, his: 85, civ: 85 }, 
     "1": { chi: 88, eng: 90, math: 85, sci: 85, geo: 88, his: 88, civ: 88 }, 
     "2": { chi: 92, eng: 95, math: 98, sci: 92, geo: 92, his: 92, civ: 92 },
   },
-  "7-1-reg-2": { // 期末考 (成績持平)
+  "7-1-reg-2": { 
     "4": { chi: 82, eng: 88, math: 72, sci: 78, geo: 82, his: 84, civ: 82 }, 
     "1": { chi: 86, eng: 89, math: 82, sci: 84, geo: 86, his: 86, civ: 86 }, 
     "2": { chi: 91, eng: 94, math: 96, sci: 91, geo: 91, his: 91, civ: 91 },
@@ -104,7 +104,7 @@ const generateExamOptions = () => {
 };
 const EXAM_OPTIONS = generateExamOptions();
 
-// --- Helper Functions (Moved out for global access) ---
+// --- Helper Functions ---
 const getCurrentExamCategory = (examId) => {
   const exam = EXAM_OPTIONS.find(e => e.id === examId);
   return exam ? exam.category : 'regular';
@@ -162,60 +162,6 @@ const ComparisonBar = ({ subject, myScore, avgScore, maxScore = 100, isCap = fal
   );
 };
 
-const TrendChart = ({ data, title }) => {
-  if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4 text-center bg-gray-50 rounded-lg">尚無足夠數據繪製趨勢圖 (需至少一次考試成績)</div>;
-  
-  const scores = data.map(d => d.score);
-  const maxVal = Math.max(...scores);
-  const isRegularTotal = maxVal > 35; 
-  
-  const height = 150;
-  const width = 300;
-  const padding = 20;
-  // 自動調整 Y 軸最大值
-  const maxScore = isRegularTotal ? 500 : 35;
-  const minScore = 0;
-  
-  // 計算 X 軸間距：如果只有一點，置中；多點則平均分佈
-  const getX = (index) => {
-    if (data.length <= 1) return width / 2;
-    return padding + (index * ((width - padding * 2) / (data.length - 1)));
-  };
-  
-  const getY = (score) => height - padding - ((score - minScore) / (maxScore - minScore)) * (height - padding * 2);
-
-  // 只有當點數大於 1 時才畫線
-  const points = data.length > 1 
-    ? data.map((d, i) => `${getX(i)},${getY(d.score)}`).join(' ') 
-    : "";
-
-  return (
-    <div className="w-full overflow-x-auto">
-      <h4 className="text-sm font-bold text-gray-600 mb-2">{title}</h4>
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="bg-white rounded-lg border border-gray-100">
-        {/* 背景網格線 */}
-        {[0, 0.25, 0.5, 0.75, 1].map(r => (
-           <line key={r} x1={padding} y1={height - padding - r*(height-2*padding)} x2={width-padding} y2={height - padding - r*(height-2*padding)} stroke="#eee" strokeWidth="1" />
-        ))}
-        
-        {/* 折線 (只有多於一點時才顯示) */}
-        {data.length > 1 && (
-          <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="2" />
-        )}
-
-        {/* 數據點 */}
-        {data.map((d, i) => (
-          <g key={i}>
-            <circle cx={getX(i)} cy={getY(d.score)} r="4" fill="#2563eb" />
-            <text x={getX(i)} y={getY(d.score) - 8} textAnchor="middle" fontSize="10" fill="#666">{d.score}</text>
-            <text x={getX(i)} y={height - 5} textAnchor="middle" fontSize="8" fill="#999">{d.examLabel.split(' ').pop()}</text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-};
-
 // --- Main App Component ---
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -225,9 +171,8 @@ export default function App() {
   const [showMenu, setShowMenu] = useState(false);
 
   // --- States ---
-  // 預設使用 Mock Data 以確保一開始就有畫面
-  const [students, setStudents] = useState(MOCK_STUDENTS);
-  const [gradesDB, setGradesDB] = useState(MOCK_GRADES);
+  const [students, setStudents] = useState(db ? [] : MOCK_STUDENTS);
+  const [gradesDB, setGradesDB] = useState(db ? {} : MOCK_GRADES);
   const [teacherProfile, setTeacherProfile] = useState(DEFAULT_TEACHER);
   const [connectionStatus, setConnectionStatus] = useState("demo"); 
   
@@ -250,8 +195,6 @@ export default function App() {
             setStudents(studentList);
             setConnectionStatus("connected");
           } else {
-             // 如果連上 DB 但裡面是空的，保持預設 Mock Data (不覆蓋為空陣列)，並設為 connected
-             // 這樣能保證「初始化按鈕」出現前，畫面不會壞掉
              setConnectionStatus("connected");
           }
         }, (err) => { 
@@ -278,10 +221,17 @@ export default function App() {
           snapshot.docs.forEach(doc => { gradesData[doc.id] = doc.data(); });
           if (Object.keys(gradesData).length > 0) {
             setGradesDB(gradesData);
+          } else {
+             setGradesDB(MOCK_GRADES); 
           }
+        }, (err) => {
+           console.warn("Using Mock Data (Grades)");
+           setGradesDB(MOCK_GRADES);
         });
         return () => unsub();
-      } catch (e) {}
+      } catch (e) { setGradesDB(MOCK_GRADES); }
+    } else {
+        setGradesDB(MOCK_GRADES);
     }
   }, []);
 
@@ -297,45 +247,30 @@ export default function App() {
   }, []);
 
   const initializeDatabase = async () => {
-    if (!db) {
-        alert("目前處於單機演示模式，無法寫入資料庫。\n請先在程式碼中填入 Firebase Config");
-        return;
-    }
-    if(!confirm("確定要寫入測試資料嗎？這將會新增範例學生與成績到您的 Firebase。")) return;
-    
+    if (!db) { alert("Demo Mode - 無法寫入"); return; }
+    if(!confirm("確定寫入測試資料?")) return;
     try {
       await setDoc(doc(db, "meta", "teacherProfile"), DEFAULT_TEACHER);
-      for (const s of MOCK_STUDENTS) {
-        await setDoc(doc(db, "students", s.id), s);
-      }
-      for (const [examId, grades] of Object.entries(MOCK_GRADES)) {
-        await setDoc(doc(db, "grades", examId), grades);
-      }
-      alert("資料庫初始化成功！");
-      window.location.reload(); 
-    } catch (error) {
-      console.error(error);
-      alert("寫入失敗。請檢查您的 Firebase Console 權限設定 (Security Rules) 是否為 Test Mode。");
-    }
+      for (const s of MOCK_STUDENTS) { await setDoc(doc(db, "students", s.id), s); }
+      for (const [examId, grades] of Object.entries(MOCK_GRADES)) { await setDoc(doc(db, "grades", examId), grades); }
+      alert("初始化成功！"); window.location.reload();
+    } catch (e) { alert("寫入失敗: " + e.message); }
   };
 
-  // --- Navigation Logic ---
-  const handleNavClick = (tab) => {
-    setActiveTab(tab);
-    setShowMenu(false);
-  };
-
+  const handleNavClick = (tab) => { setActiveTab(tab); setShowMenu(false); };
+  
   const handleLogin = (role, account, password) => {
+    const allowDefault = (connectionStatus !== 'connected' || students.length === 0 || students === MOCK_STUDENTS);
     if (role === 'teacher') {
-      // 寬鬆判定：如果資料庫空或連線異常，允許預設登入
-      const isDefaultLogin = (connectionStatus !== 'connected' || students.length === 0 || students === MOCK_STUDENTS) && account === DEFAULT_TEACHER.account && password === DEFAULT_TEACHER.password;
-      
-      if (isDefaultLogin || (account === teacherProfile.account && password === teacherProfile.password)) {
+      const isDefaultLogin = (allowDefault && account === DEFAULT_TEACHER.account && password === DEFAULT_TEACHER.password);
+      const isProfileLogin = (account === teacherProfile.account && password === teacherProfile.password);
+
+      if (isDefaultLogin || isProfileLogin) {
         setUserRole('teacher');
         setCurrentUser(isDefaultLogin ? DEFAULT_TEACHER : teacherProfile);
         setIsLoggedIn(true);
         setActiveTab('dashboard');
-      } else { alert("教師帳號或密碼錯誤"); }
+      } else { alert("教師帳號錯誤 (t888/888)"); }
     } else {
       const student = students.find(s => s.account === account && s.password === password);
       if (student) {
@@ -345,22 +280,37 @@ export default function App() {
         setActiveTab('dashboard');
         const lastExamId = Object.keys(gradesDB).reverse().find(eid => gradesDB[eid] && gradesDB[eid][student.id]);
         if (lastExamId) setParentExamId(lastExamId);
-      } else { alert("學生帳號或密碼錯誤"); }
+      } else { alert("學生帳號錯誤 (s11204/123)"); }
     }
   };
 
-  // --- Teacher Actions ---
+  // Teacher Handlers
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const newProfile = { ...teacherProfile, className: formData.get('className'), name: formData.get('name') };
     if(db) await setDoc(doc(db, "meta", "teacherProfile"), newProfile);
     else setTeacherProfile(newProfile);
-    alert("班級資訊已更新！");
+    alert("更新成功");
   };
-  const handleUpdateStudent = async () => { /* ... same ... */ };
-  const handleDeleteStudent = async (id) => { /* ... same ... */ };
-  const handleGradeChange = async (studentId, subject, value) => { /* ... same ... */ };
+  const handleUpdateStudent = async () => { setEditingStudentId(null); };
+  const handleDeleteStudent = async (id) => { /* ... */ };
+  const handleGradeChange = async (studentId, subject, value) => {
+    const currentCategory = getCurrentExamCategory(teacherExamId);
+    let finalValue = value;
+    if (currentCategory === 'regular') finalValue = Number(value);
+    
+    if(db) {
+        await setDoc(doc(db, "grades", teacherExamId), {
+            [studentId]: { ...(gradesDB[teacherExamId]?.[studentId] || {}), [subject]: finalValue }
+        }, { merge: true });
+    } else {
+        setGradesDB(prev => ({
+            ...prev,
+            [teacherExamId]: { ...(prev[teacherExamId] || {}), [studentId]: { ...(prev[teacherExamId]?.[studentId] || {}), [subject]: finalValue } }
+        }));
+    }
+  };
   const handleSort = (key) => {
     let direction = 'desc';
     if (key === 'seat' || key === 'rank') direction = 'asc';
@@ -372,7 +322,7 @@ export default function App() {
   const handleDownloadGradeTemplate = () => {};
   const handleGradeUpload = () => {};
 
-  // --- Data Logic: Class Statistics ---
+  // --- Statistics Logic ---
   const calculateExamStatistics = (examId, studentsData, gradesData) => {
     const category = getCurrentExamCategory(examId);
     const examGrades = gradesData[examId] || {};
@@ -413,16 +363,8 @@ export default function App() {
     return { averages, passRates, hasData: counts['total'] > 0 };
   };
 
-  const teacherExamStats = useMemo(() => {
-    return calculateExamStatistics(teacherExamId, students, gradesDB);
-  }, [teacherExamId, students, gradesDB]);
-
-  const allExamStats = useMemo(() => {
-    return EXAM_OPTIONS.map(opt => {
-      const stats = calculateExamStatistics(opt.id, students, gradesDB);
-      return { ...opt, ...stats };
-    }).filter(e => e.hasData);
-  }, [students, gradesDB]);
+  const teacherExamStats = useMemo(() => calculateExamStatistics(teacherExamId, students, gradesDB), [teacherExamId, students, gradesDB]);
+  const allExamStats = useMemo(() => EXAM_OPTIONS.map(opt => ({ ...opt, ...calculateExamStatistics(opt.id, students, gradesDB) })).filter(e => e.hasData), [students, gradesDB]);
 
   const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId);
   
@@ -456,18 +398,6 @@ export default function App() {
       category 
     };
   }, [currentUser, parentExamId, gradesDB, students]);
-
-  const trendData = useMemo(() => {
-    if (!currentUser || userRole !== 'parent') return [];
-    const currentCat = getCurrentExamCategory(parentExamId);
-    const availableExams = EXAM_OPTIONS.filter(opt => gradesDB[opt.id] && gradesDB[opt.id][currentUser.id] && opt.category === currentCat);
-    return availableExams.map(opt => {
-      const scores = gradesDB[opt.id][currentUser.id];
-      const { total } = calculateStats(scores, opt.category);
-      const val = total;
-      return { examLabel: opt.label, score: parseFloat(val) };
-    });
-  }, [currentUser, gradesDB, parentExamId]);
 
   const teacherTableData = useMemo(() => {
     if (userRole !== 'teacher') return [];
@@ -504,7 +434,7 @@ export default function App() {
          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md relative">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">{teacherProfile.className} 成績查詢系統</h1>
-            <p className="text-gray-500">親師互動平台</p>
+            <p className="text-gray-500"></p>
           </div>
           <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
             <button className={`flex-1 py-2 rounded-md transition-all ${userRole === 'parent' ? 'bg-white text-blue-600 shadow' : 'text-gray-500'}`} onClick={() => setUserRole('parent')}>我是家長</button>
@@ -550,7 +480,7 @@ export default function App() {
           {userRole === 'teacher' ? (
             <>
               <button onClick={() => handleNavClick('dashboard')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'dashboard' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Monitor size={20}/><span>教師控制台</span></button>
-              <button onClick={() => handleNavClick('stats')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'stats' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><LineChart size={20}/><span>各次段考平均</span></button>
+              <button onClick={() => handleNavClick('stats')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'stats' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><LineChart size={20}/><span>班級各次段考平均</span></button>
               <button onClick={() => handleNavClick('students')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'students' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Users size={20}/><span>學生資料管理</span></button>
               <button onClick={() => handleNavClick('grades')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'grades' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Edit size={20}/><span>成績登錄管理</span></button>
               <button onClick={() => handleNavClick('settings')} className={`flex items-center space-x-3 w-full p-3 rounded-lg ${activeTab === 'settings' ? 'bg-blue-100 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-100'}`}><Settings size={20}/><span>班級設定</span></button>
@@ -574,28 +504,6 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-
-            {/* Total Average Trend Chart */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-               <h3 className="font-bold text-gray-700 mb-4">班級總分平均走勢 (段考)</h3>
-               <div className="h-48 flex items-end space-x-4 border-b border-l border-gray-200 p-4">
-                  {allExamStats.filter(e => e.category === 'regular').map((stat, idx) => {
-                     const height = (stat.averages.total / 500) * 100;
-                     return (
-                       <div key={idx} className="flex-1 flex flex-col justify-end items-center group relative">
-                         <div className="bg-blue-500 w-full max-w-[40px] rounded-t-lg transition-all hover:bg-blue-600" style={{ height: `${height}%` }}></div>
-                         <div className="text-xs text-gray-500 mt-2 truncate w-full text-center">{stat.label.split(' ').pop()}</div>
-                         <div className="absolute -top-6 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                           {stat.averages.total}
-                         </div>
-                       </div>
-                     );
-                  })}
-                  {allExamStats.filter(e => e.category === 'regular').length === 0 && <div className="text-gray-400 w-full text-center self-center">尚無段考資料</div>}
-               </div>
-            </div>
-
-            {/* Statistics Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -816,14 +724,13 @@ export default function App() {
             </div>
             
             {/* ... Summary Cards ... */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 relative overflow-hidden">
                   <div className="relative z-10"><p className="text-blue-100 text-sm">{currentExamData.category === 'regular' ? '本次總分' : '會考總積分'}</p><h3 className="text-5xl font-bold mt-2">{currentExamData.myScores.total}</h3><div className="mt-4 flex items-center space-x-2"><span className="bg-white/20 px-2 py-1 rounded text-xs">班排 #{currentExamData.rank}</span></div></div>
                </div>
                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col justify-between">
                   <div><h4 className="text-gray-500 text-sm font-bold mb-2">班級統計比較</h4><div className="flex justify-between items-center"><span className="text-gray-600 text-sm">班級平均</span><span className="font-bold text-gray-800">{currentExamData.avgTotal}</span></div></div>
                </div>
-               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"><TrendChart data={trendData} title={currentExamData.category==='regular' ? "我的段考總分走勢" : "我的模考積分走勢"} /></div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -842,7 +749,10 @@ export default function App() {
                    <thead className="bg-gray-50 text-gray-500"><tr><th className="p-3 text-left">科目</th><th className="p-3 text-center">成績</th></tr></thead>
                    <tbody className="divide-y divide-gray-100">
                       {(currentExamData.category === 'regular' ? [{l:'國文',k:'chi'}, {l:'英語',k:'eng'}, {l:'數學',k:'math'}, {l:'自然',k:'sci'}, {l:'地理',k:'geo'}, {l:'歷史',k:'his'}, {l:'公民',k:'civ'}, {l:'社會平均', k:'social'}] : [{l:'國文',k:'chi'}, {l:'英語',k:'eng'}, {l:'數學',k:'math'}, {l:'自然',k:'sci'}, {l:'社會',k:'soc'}]).map(sub => (
-                        <tr key={sub.k}><td className="p-3 font-medium">{sub.l}</td><td className="p-3 text-center font-bold text-blue-600">{currentExamData.myScores[sub.k] || '-'}</td></tr>
+                        <tr key={sub.k}>
+                          <td className="p-3 font-medium">{sub.l}</td>
+                          <td className="p-3 text-center font-bold text-blue-600">{currentExamData.myScores[sub.k] || '-'}</td>
+                        </tr>
                       ))}
                    </tbody>
                    {/* Parent View Footer: Class Average */}
@@ -868,7 +778,7 @@ export default function App() {
              {/* ... Buttons ... */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <button onClick={() => handleNavClick('stats')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
-                 <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-purple-50 rounded-lg"><LineChart className="w-8 h-8 text-purple-600"/></div><h3 className="font-bold text-gray-800 text-lg">各次段考平均</h3></div><p className="text-sm text-gray-500">查看班級歷史成績走勢與統計分析。</p>
+                 <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-purple-50 rounded-lg"><LineChart className="w-8 h-8 text-purple-600"/></div><h3 className="font-bold text-gray-800 text-lg">班級各次段考平均</h3></div><p className="text-sm text-gray-500">查看班級歷史成績統計分析。</p>
                </button>
                <button onClick={() => handleNavClick('grades')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
                  <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-green-50 rounded-lg"><Edit className="w-8 h-8 text-green-600"/></div><h3 className="font-bold text-gray-800 text-lg">成績登錄管理</h3></div><p className="text-sm text-gray-500">輸入成績並檢視單次考試排名。</p>
