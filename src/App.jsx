@@ -415,14 +415,20 @@ export default function App() {
     setSortConfig({ key, direction });
   };
   
-  // CSV Handlers
+  // CSV Handlers (Restored)
   const handleDownloadStudentTemplate = () => {
-    const BOM = "\uFEFF"; const headers = "座號,姓名,帳號,密碼";
+    const BOM = "\uFEFF"; 
+    const headers = "座號,姓名,帳號,密碼";
     const csvContent = BOM + headers + "\n6,範例王小明,s11206,123456\n7,範例林小美,s11207,123456";
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a"); link.href = url; link.download = "學生資料匯入範本.csv"; link.click();
+    const link = document.createElement("a"); 
+    link.href = url; 
+    link.download = "學生資料匯入範本.csv"; 
+    link.click();
+    URL.revokeObjectURL(url);
   };
+  
   const handleStudentUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -431,10 +437,12 @@ export default function App() {
         const content = e.target.result;
         const lines = content.split(/\r\n|\n/);
         let count = 0;
+        // Parse CSV lines
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           const parts = line.split(',');
+          // Ensure at least 4 columns
           if (parts.length >= 4) {
              const seat = parseInt(parts[0].trim());
              const name = parts[1].trim();
@@ -456,6 +464,7 @@ export default function App() {
     reader.readAsText(file);
     event.target.value = ''; 
   };
+
   const handleDownloadGradeTemplate = () => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     const BOM = "\uFEFF"; 
@@ -464,8 +473,13 @@ export default function App() {
     const csvContent = BOM + headers + "\n" + example;
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a"); link.href = url; link.download = `${currentCategory==='regular'?'段考':'模考'}_成績匯入範本.csv`; link.click();
+    const link = document.createElement("a"); 
+    link.href = url; 
+    link.download = `${currentCategory==='regular'?'段考':'模考'}_成績匯入範本.csv`; 
+    link.click();
+    URL.revokeObjectURL(url);
   };
+
   const handleGradeUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -476,12 +490,15 @@ export default function App() {
         const lines = content.split(/\r\n|\n/);
         const updates = {};
         let count = 0;
+        
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           const parts = line.split(',');
+          // Check format based on category
           const seat = parseInt(parts[0].trim());
           const student = students.find(s => s.seat === seat);
+          
           if (student) {
              const scores = {};
              if (currentCategory === 'regular' && parts.length >= 9) {
@@ -697,7 +714,28 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-            {/* Statistics Table Only (No Trend Chart) */}
+
+            {/* Total Average Trend Chart */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+               <h3 className="font-bold text-gray-700 mb-4">班級總分平均走勢 (段考)</h3>
+               <div className="h-48 flex items-end space-x-4 border-b border-l border-gray-200 p-4">
+                  {allExamStats.filter(e => e.category === 'regular').map((stat, idx) => {
+                     const height = (stat.averages.total / 500) * 100;
+                     return (
+                       <div key={idx} className="flex-1 flex flex-col justify-end items-center group relative">
+                         <div className="bg-blue-500 w-full max-w-[40px] rounded-t-lg transition-all hover:bg-blue-600" style={{ height: `${height}%` }}></div>
+                         <div className="text-xs text-gray-500 mt-2 truncate w-full text-center">{stat.label.split(' ').pop()}</div>
+                         <div className="absolute -top-6 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                           {stat.averages.total}
+                         </div>
+                       </div>
+                     );
+                  })}
+                  {allExamStats.filter(e => e.category === 'regular').length === 0 && <div className="text-gray-400 w-full text-center self-center">尚無段考資料</div>}
+               </div>
+            </div>
+
+            {/* Statistics Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -756,10 +794,20 @@ export default function App() {
           <div className="max-w-5xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Users className="mr-2 text-blue-600"/> 學生資料與帳號管理</h2>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-               <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <span className="font-bold text-gray-700">學生列表 ({students.length}人)</span>
-                <div className="flex gap-2">
-                   <button onClick={() => { setEditingStudentId('new'); setTempStudentData({ seat: '', name: '', account: '', password: '' }); }} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center hover:bg-green-700"><Plus size={16} className="mr-1"/> 新增學生</button>
+                
+                <div className="flex gap-2 w-full md:w-auto">
+                  <button onClick={handleDownloadStudentTemplate} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-gray-200 transition-colors">
+                    <Download size={16} className="mr-1"/> 下載範本
+                  </button>
+                  <label className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-blue-200 cursor-pointer transition-colors">
+                    <Upload size={16} className="mr-1"/> 批次匯入
+                    <input type="file" accept=".csv" className="hidden" onChange={handleStudentUpload} />
+                  </label>
+                  <button onClick={() => { setEditingStudentId('new'); setTempStudentData({ seat: '', name: '', account: '', password: '' }); }} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center hover:bg-green-700 transition-colors">
+                    <Plus size={16} className="mr-1"/> 新增學生
+                  </button>
                 </div>
               </div>
               <table className="w-full text-left">
@@ -767,10 +815,10 @@ export default function App() {
                 <tbody className="divide-y divide-gray-100">
                   {editingStudentId === 'new' && (
                     <tr className="bg-green-50">
-                      <td className="p-4"><input className="w-16 border rounded p-1" value={tempStudentData.seat} onChange={e => setTempStudentData({...tempStudentData, seat: Number(e.target.value)})}/></td>
-                      <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.name} onChange={e => setTempStudentData({...tempStudentData, name: e.target.value})}/></td>
-                      <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.account} onChange={e => setTempStudentData({...tempStudentData, account: e.target.value})}/></td>
-                      <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.password} onChange={e => setTempStudentData({...tempStudentData, password: e.target.value})}/></td>
+                      <td className="p-4"><input className="w-16 border rounded p-1" placeholder="座號" value={tempStudentData.seat} onChange={e => setTempStudentData({...tempStudentData, seat: Number(e.target.value)})}/></td>
+                      <td className="p-4"><input className="w-32 border rounded p-1" placeholder="姓名" value={tempStudentData.name} onChange={e => setTempStudentData({...tempStudentData, name: e.target.value})}/></td>
+                      <td className="p-4"><input className="w-32 border rounded p-1" placeholder="帳號" value={tempStudentData.account} onChange={e => setTempStudentData({...tempStudentData, account: e.target.value})}/></td>
+                      <td className="p-4"><input className="w-32 border rounded p-1" placeholder="密碼" value={tempStudentData.password} onChange={e => setTempStudentData({...tempStudentData, password: e.target.value})}/></td>
                       <td className="p-4 text-center"><button onClick={handleUpdateStudent} className="text-green-600 mr-2"><Save size={18}/></button></td>
                     </tr>
                   )}
@@ -803,6 +851,8 @@ export default function App() {
                  </div>
                </div>
                <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
+                 <button onClick={handleDownloadGradeTemplate} className="flex items-center space-x-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200"><FileSpreadsheet size={16}/><span>下載範本</span></button>
+                 <label className="flex items-center space-x-1 bg-blue-100 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-200 cursor-pointer"><Upload size={16}/><span>批次匯入</span><input type="file" accept=".csv" className="hidden" onChange={handleGradeUpload} /></label>
                  <button onClick={() => window.print()} className="flex items-center space-x-1 bg-gray-800 text-white px-3 py-2 rounded-lg hover:bg-gray-700"><Printer size={16}/><span>列印</span></button>
                </div>
             </div>
