@@ -714,28 +714,7 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-
-            {/* Total Average Trend Chart */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-               <h3 className="font-bold text-gray-700 mb-4">班級總分平均走勢 (段考)</h3>
-               <div className="h-48 flex items-end space-x-4 border-b border-l border-gray-200 p-4">
-                  {allExamStats.filter(e => e.category === 'regular').map((stat, idx) => {
-                     const height = (stat.averages.total / 500) * 100;
-                     return (
-                       <div key={idx} className="flex-1 flex flex-col justify-end items-center group relative">
-                         <div className="bg-blue-500 w-full max-w-[40px] rounded-t-lg transition-all hover:bg-blue-600" style={{ height: `${height}%` }}></div>
-                         <div className="text-xs text-gray-500 mt-2 truncate w-full text-center">{stat.label.split(' ').pop()}</div>
-                         <div className="absolute -top-6 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                           {stat.averages.total}
-                         </div>
-                       </div>
-                     );
-                  })}
-                  {allExamStats.filter(e => e.category === 'regular').length === 0 && <div className="text-gray-400 w-full text-center self-center">尚無段考資料</div>}
-               </div>
-            </div>
-
-            {/* Statistics Table */}
+            {/* Statistics Table Only (No Trend Chart) */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -794,20 +773,12 @@ export default function App() {
           <div className="max-w-5xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Users className="mr-2 text-blue-600"/> 學生資料與帳號管理</h2>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+               <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <span className="font-bold text-gray-700">學生列表 ({students.length}人)</span>
-                
-                <div className="flex gap-2 w-full md:w-auto">
-                  <button onClick={handleDownloadStudentTemplate} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-gray-200 transition-colors">
-                    <Download size={16} className="mr-1"/> 下載範本
-                  </button>
-                  <label className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-blue-200 cursor-pointer transition-colors">
-                    <Upload size={16} className="mr-1"/> 批次匯入
-                    <input type="file" accept=".csv" className="hidden" onChange={handleStudentUpload} />
-                  </label>
-                  <button onClick={() => { setEditingStudentId('new'); setTempStudentData({ seat: '', name: '', account: '', password: '' }); }} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center hover:bg-green-700 transition-colors">
-                    <Plus size={16} className="mr-1"/> 新增學生
-                  </button>
+                <div className="flex gap-2">
+                   <button onClick={handleDownloadStudentTemplate} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-gray-200"><Download size={16} className="mr-1"/> 下載範本</button>
+                   <label className="bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-blue-200 cursor-pointer"><Upload size={16} className="mr-1"/> 批次匯入<input type="file" accept=".csv" className="hidden" onChange={handleStudentUpload} /></label>
+                   <button onClick={() => { setEditingStudentId('new'); setTempStudentData({ seat: '', name: '', account: '', password: '' }); }} className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm flex items-center hover:bg-green-700"><Plus size={16} className="mr-1"/> 新增學生</button>
                 </div>
               </div>
               <table className="w-full text-left">
@@ -815,10 +786,10 @@ export default function App() {
                 <tbody className="divide-y divide-gray-100">
                   {editingStudentId === 'new' && (
                     <tr className="bg-green-50">
-                      <td className="p-4"><input className="w-16 border rounded p-1" placeholder="座號" value={tempStudentData.seat} onChange={e => setTempStudentData({...tempStudentData, seat: Number(e.target.value)})}/></td>
-                      <td className="p-4"><input className="w-32 border rounded p-1" placeholder="姓名" value={tempStudentData.name} onChange={e => setTempStudentData({...tempStudentData, name: e.target.value})}/></td>
-                      <td className="p-4"><input className="w-32 border rounded p-1" placeholder="帳號" value={tempStudentData.account} onChange={e => setTempStudentData({...tempStudentData, account: e.target.value})}/></td>
-                      <td className="p-4"><input className="w-32 border rounded p-1" placeholder="密碼" value={tempStudentData.password} onChange={e => setTempStudentData({...tempStudentData, password: e.target.value})}/></td>
+                      <td className="p-4"><input className="w-16 border rounded p-1" value={tempStudentData.seat} onChange={e => setTempStudentData({...tempStudentData, seat: Number(e.target.value)})}/></td>
+                      <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.name} onChange={e => setTempStudentData({...tempStudentData, name: e.target.value})}/></td>
+                      <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.account} onChange={e => setTempStudentData({...tempStudentData, account: e.target.value})}/></td>
+                      <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.password} onChange={e => setTempStudentData({...tempStudentData, password: e.target.value})}/></td>
                       <td className="p-4 text-center"><button onClick={handleUpdateStudent} className="text-green-600 mr-2"><Save size={18}/></button></td>
                     </tr>
                   )}
@@ -967,7 +938,7 @@ export default function App() {
               </div>
             </div>
             
-            {/* ... Summary Cards (Removed TrendChart) ... */}
+            {/* ... Summary Cards ... */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 relative overflow-hidden">
                   <div className="relative z-10">
