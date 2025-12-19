@@ -163,6 +163,53 @@ const ComparisonBar = ({ subject, myScore, avgScore, maxScore = 100, isCap = fal
   );
 };
 
+const TrendChart = ({ data, title }) => {
+  if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4 text-center bg-gray-50 rounded-lg">尚無足夠數據繪製趨勢圖 (需至少一次考試成績)</div>;
+  
+  const scores = data.map(d => d.score);
+  const maxVal = Math.max(...scores);
+  const isRegularTotal = maxVal > 35; 
+  
+  const height = 150;
+  const width = 300;
+  const padding = 20;
+  const maxScore = isRegularTotal ? 500 : 35;
+  const minScore = 0;
+  
+  const getX = (index) => {
+    const count = data.length > 1 ? data.length - 1 : 1;
+    if (data.length <= 1) return width / 2;
+    return padding + (index * ((width - padding * 2) / (data.length - 1)));
+  };
+  
+  const getY = (score) => height - padding - ((score - minScore) / (maxScore - minScore)) * (height - padding * 2);
+  
+  const points = data.length > 1 
+    ? data.map((d, i) => `${getX(i)},${getY(d.score)}`).join(' ') 
+    : "";
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <h4 className="text-sm font-bold text-gray-600 mb-2">{title}</h4>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="bg-white rounded-lg border border-gray-100" style={{ overflow: 'visible' }}>
+        {[0, 0.25, 0.5, 0.75, 1].map(r => (
+           <line key={r} x1={padding} y1={height - padding - r*(height-2*padding)} x2={width-padding} y2={height - padding - r*(height-2*padding)} stroke="#eee" strokeWidth="1" />
+        ))}
+        {data.length > 1 && (
+          <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="3" />
+        )}
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle cx={getX(i)} cy={getY(d.score)} r="5" fill="#2563eb" />
+            <text x={getX(i)} y={getY(d.score) - 10} textAnchor="middle" fontSize="12" fill="#4b5563" fontWeight="bold">{d.score}</text>
+            <text x={getX(i)} y={height - 5} textAnchor="middle" fontSize="10" fill="#9ca3af">{d.examLabel.split(' ').pop()}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
 // --- Main App Component ---
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -427,6 +474,17 @@ export default function App() {
       category 
     };
   }, [currentUser, parentExamId, gradesDB, students]);
+
+  const trendData = useMemo(() => {
+    if (!currentUser || userRole !== 'parent') return [];
+    const currentCat = getCurrentExamCategory(parentExamId);
+    const availableExams = EXAM_OPTIONS.filter(opt => gradesDB[opt.id] && gradesDB[opt.id][currentUser.id] && opt.category === currentCat);
+    return availableExams.map(opt => {
+      const scores = gradesDB[opt.id][currentUser.id];
+      const { total } = calculateStats(scores, opt.category);
+      return { examLabel: opt.label, score: parseFloat(total) };
+    });
+  }, [currentUser, gradesDB, parentExamId]);
 
   const teacherTableData = useMemo(() => {
     if (userRole !== 'teacher') return [];
@@ -750,7 +808,7 @@ export default function App() {
             </div>
             
             {/* ... Summary Cards (Removed TrendChart) ... */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 relative overflow-hidden">
                   <div className="relative z-10">
                     <p className="text-blue-100 text-sm">{currentExamData.category === 'regular' ? '本次總分' : '會考總積分'}</p>
@@ -779,6 +837,10 @@ export default function App() {
                        </span>
                     </div>
                   </div>
+               </div>
+               {/* 恢復：走勢圖 (TrendChart) - 請將此行加回以顯示圖表 */}
+               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                 <TrendChart data={trendData} title={currentExamData.category==='regular' ? "段考總分走勢" : "模考積分走勢"} />
                </div>
             </div>
 
