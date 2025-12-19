@@ -163,6 +163,53 @@ const ComparisonBar = ({ subject, myScore, avgScore, maxScore = 100, isCap = fal
   );
 };
 
+const TrendChart = ({ data, title }) => {
+  if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4 text-center bg-gray-50 rounded-lg">尚無足夠數據繪製趨勢圖 (需至少一次考試成績)</div>;
+  
+  const scores = data.map(d => d.score);
+  const maxVal = Math.max(...scores);
+  const isRegularTotal = maxVal > 35; 
+  
+  const height = 150;
+  const width = 300;
+  const padding = 20;
+  const maxScore = isRegularTotal ? 500 : 35;
+  const minScore = 0;
+  
+  const getX = (index) => {
+    const count = data.length > 1 ? data.length - 1 : 1;
+    if (data.length <= 1) return width / 2;
+    return padding + (index * ((width - padding * 2) / (data.length - 1)));
+  };
+  
+  const getY = (score) => height - padding - ((score - minScore) / (maxScore - minScore)) * (height - padding * 2);
+  
+  const points = data.length > 1 
+    ? data.map((d, i) => `${getX(i)},${getY(d.score)}`).join(' ') 
+    : "";
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <h4 className="text-sm font-bold text-gray-600 mb-2">{title}</h4>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="bg-white rounded-lg border border-gray-100" style={{ overflow: 'visible' }}>
+        {[0, 0.25, 0.5, 0.75, 1].map(r => (
+           <line key={r} x1={padding} y1={height - padding - r*(height-2*padding)} x2={width-padding} y2={height - padding - r*(height-2*padding)} stroke="#eee" strokeWidth="1" />
+        ))}
+        {data.length > 1 && (
+          <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="3" />
+        )}
+        {data.map((d, i) => (
+          <g key={i}>
+            <circle cx={getX(i)} cy={getY(d.score)} r="5" fill="#2563eb" />
+            <text x={getX(i)} y={getY(d.score) - 10} textAnchor="middle" fontSize="12" fill="#4b5563" fontWeight="bold">{d.score}</text>
+            <text x={getX(i)} y={height - 5} textAnchor="middle" fontSize="10" fill="#9ca3af">{d.examLabel.split(' ').pop()}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+};
+
 // --- Main App Component ---
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -544,7 +591,27 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-            {/* Statistics Table Only (No Trend Chart) */}
+            {/* 恢復：將走勢圖加回來 */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+               <h3 className="font-bold text-gray-700 mb-4">班級總分平均走勢 (段考)</h3>
+               <div className="h-48 flex items-end space-x-4 border-b border-l border-gray-200 p-4">
+                  {allExamStats.filter(e => e.category === 'regular').map((stat, idx) => {
+                     const height = (stat.averages.total / 500) * 100;
+                     return (
+                       <div key={idx} className="flex-1 flex flex-col justify-end items-center group relative">
+                         <div className="bg-blue-500 w-full max-w-[40px] rounded-t-lg transition-all hover:bg-blue-600" style={{ height: `${height}%` }}></div>
+                         <div className="text-xs text-gray-500 mt-2 truncate w-full text-center">{stat.label.split(' ').pop()}</div>
+                         <div className="absolute -top-6 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                           {stat.averages.total}
+                         </div>
+                       </div>
+                     );
+                  })}
+                  {allExamStats.filter(e => e.category === 'regular').length === 0 && <div className="text-gray-400 w-full text-center self-center">尚無段考資料</div>}
+               </div>
+            </div>
+
+            {/* Statistics Table Only */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -764,13 +831,12 @@ export default function App() {
               </div>
             </div>
             
-            {/* ... Summary Cards (Removed TrendChart) ... */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* ... Summary Cards (RESTORED TREND CHART) ... */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 relative overflow-hidden">
                   <div className="relative z-10">
                     <p className="text-blue-100 text-sm">{currentExamData.category === 'regular' ? '本次總分' : '會考總積分'}</p>
                     <h3 className="text-5xl font-bold mt-2">{currentExamData.myScores.total}</h3>
-                    {/* 放大班排顯示 */}
                     <div className="mt-4 flex items-baseline space-x-2">
                       <span className="bg-white/20 px-3 py-1 rounded-lg text-2xl font-bold">班排 #{currentExamData.rank}</span>
                       <span className="text-sm text-blue-100">/ {currentExamData.totalStudents} 人</span>
@@ -795,6 +861,8 @@ export default function App() {
                     </div>
                   </div>
                </div>
+               {/* 恢復：走勢圖 */}
+               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"><TrendChart data={trendData} title={currentExamData.category==='regular' ? "我的段考總分走勢" : "我的模考積分走勢"} /></div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -842,7 +910,7 @@ export default function App() {
              {/* ... Buttons ... */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <button onClick={() => handleNavClick('stats')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
-                 <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-purple-50 rounded-lg"><LineChart className="w-8 h-8 text-purple-600"/></div><h3 className="font-bold text-gray-800 text-lg">各次段考平均</h3></div><p className="text-sm text-gray-500">查看班級歷史成績統計分析。</p>
+                 <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-purple-50 rounded-lg"><LineChart className="w-8 h-8 text-purple-600"/></div><h3 className="font-bold text-gray-800 text-lg">班級各次段考平均</h3></div><p className="text-sm text-gray-500">查看班級歷史成績走勢與統計分析。</p>
                </button>
                <button onClick={() => handleNavClick('grades')} className="p-6 bg-white shadow-sm border border-gray-100 rounded-xl hover:shadow-md transition-all text-left">
                  <div className="flex items-center space-x-4 mb-2"><div className="p-3 bg-green-50 rounded-lg"><Edit className="w-8 h-8 text-green-600"/></div><h3 className="font-bold text-gray-800 text-lg">成績登錄管理</h3></div><p className="text-sm text-gray-500">輸入成績並檢視單次考試排名。</p>
