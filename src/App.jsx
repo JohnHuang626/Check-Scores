@@ -78,6 +78,7 @@ const DEFAULT_TEACHER = {
 const CAP_POINTS = { "A++": 7, "A+": 6, "A": 5, "B++": 4, "B+": 3, "B": 2, "C": 1 };
 const CAP_OPTIONS = ["A++", "A+", "A", "B++", "B+", "B", "C"];
 
+// 修改：將考試選單分為「段考」與「模擬考」兩大類，並將段考排在前面
 const generateExamOptions = () => {
   const grades = ['七年級', '八年級', '九年級'];
   const semesters = ['上學期', '下學期'];
@@ -85,23 +86,44 @@ const generateExamOptions = () => {
   const reviewExams = ['學期複習考']; 
   const mockExams = ['第一次模擬考', '第二次模擬考', '第三次模擬考', '第四次模擬考', '會考模擬'];
   
-  let options = [];
+  let regularOptions = [];
+  let otherOptions = [];
+  
   grades.forEach((g, gIdx) => {
     semesters.forEach((s, sIdx) => {
+      // 1. 段考 (Regular) -> 放入 regularOptions
       regularExams.forEach((e, eIdx) => {
-        options.push({ id: `${gIdx+7}-${sIdx+1}-reg-${eIdx}`, label: `${g} ${s} ${e}`, category: 'regular' });
+        regularOptions.push({
+          id: `${gIdx+7}-${sIdx+1}-reg-${eIdx}`, 
+          label: `${g} ${s} ${e}`,
+          category: 'regular'
+        });
       });
+
+      // 2. 複習考 (Review) -> 放入 otherOptions
       reviewExams.forEach((e, eIdx) => {
-        options.push({ id: `${gIdx+7}-${sIdx+1}-rev-${eIdx}`, label: `${g} ${s} ${e}`, category: 'cap' });
+        otherOptions.push({
+          id: `${gIdx+7}-${sIdx+1}-rev-${eIdx}`, 
+          label: `${g} ${s} ${e}`,
+          category: 'cap'
+        });
       });
+
+      // 3. 模擬考 (Mock) -> 放入 otherOptions
       if (g === '九年級') {
         mockExams.forEach((m, mIdx) => {
-           options.push({ id: `9-${sIdx+1}-mock-${mIdx}`, label: `${g} ${s} ${m}`, category: 'cap' });
+           otherOptions.push({
+            id: `9-${sIdx+1}-mock-${mIdx}`, 
+            label: `${g} ${s} ${m}`,
+            category: 'cap'
+          });
         });
       }
     });
   });
-  return options;
+  
+  // 回傳順序：先段考，後模考
+  return [...regularOptions, ...otherOptions];
 };
 const EXAM_OPTIONS = generateExamOptions();
 
@@ -354,8 +376,19 @@ export default function App() {
         setCurrentUser(student);
         setIsLoggedIn(true);
         setActiveTab('dashboard');
-        const lastExamId = Object.keys(gradesDB).reverse().find(eid => gradesDB[eid] && gradesDB[eid][student.id]);
-        if (lastExamId) setParentExamId(lastExamId);
+        
+        // 修正：家長登入後，預先載入最新一次「段考」成績
+        // 1. 篩選出所有 category 為 'regular' 的考試 ID
+        const regularExamIds = EXAM_OPTIONS.filter(opt => opt.category === 'regular').map(opt => opt.id);
+        
+        // 2. 找到最後一次有成績的段考
+        // 反轉 regularExamIds 以從最新開始找，並確認該學生在 gradesDB 對應的 ID 中有分數
+        const lastRegularExamId = [...regularExamIds].reverse().find(eid => gradesDB[eid] && gradesDB[eid][student.id]);
+        
+        // 3. 如果有找到，設定為預設；否則保持預設值 (通常是第一個段考)
+        if (lastRegularExamId) {
+            setParentExamId(lastRegularExamId);
+        }
       } else { alert("學生帳號錯誤 (s11204/123)"); }
     }
   };
@@ -415,7 +448,7 @@ export default function App() {
     setSortConfig({ key, direction });
   };
   
-  // CSV Handlers (Restored)
+  // CSV Handlers
   const handleDownloadStudentTemplate = () => {
     const BOM = "\uFEFF"; 
     const headers = "座號,姓名,帳號,密碼";
@@ -938,7 +971,7 @@ export default function App() {
               </div>
             </div>
             
-            {/* ... Summary Cards ... */}
+            {/* ... Summary Cards (RESTORED TREND CHART) ... */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl shadow-lg p-6 relative overflow-hidden">
                   <div className="relative z-10">
