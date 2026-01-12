@@ -9,7 +9,7 @@ import {
   XCircle, Edit, Printer, Save, ArrowUpDown, ArrowUp, ArrowDown,
   Plus, Trash2, Key, BarChart2, Search, Download, Upload,
   School, Monitor, FileSpreadsheet, Settings, Database, AlertCircle, CloudOff,
-  LineChart, Trophy
+  LineChart, Trophy, Medal
 } from 'lucide-react';
 
 // !!!!!!!!!!!!! 重要設定 !!!!!!!!!!!!!
@@ -28,7 +28,7 @@ let app;
 let db;
 
 try {
-  if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 0) {
+  if (firebaseConfig.apiKey) {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
   } else {
@@ -38,7 +38,7 @@ try {
   console.warn("Firebase 初始化跳過:", error);
 }
 
-// --- 備用模擬資料 (單機演示模式用) ---
+// --- 備用模擬資料 ---
 const MOCK_STUDENTS = [
   { id: "1", seat: 1, name: "範例王大明", account: "s11201", password: "123" },
   { id: "2", seat: 2, name: "範例林小美", account: "s11202", password: "123" },
@@ -49,19 +49,19 @@ const MOCK_STUDENTS = [
 
 const MOCK_GRADES = {
   "7-1-reg-0": { 
-    "4": { chi: 80, eng: 85, math: 70, sci: 75, geo: 80, his: 82, civ: 80 }, 
-    "1": { chi: 85, eng: 88, math: 80, sci: 82, geo: 85, his: 85, civ: 85 }, 
-    "2": { chi: 90, eng: 92, math: 95, sci: 90, geo: 90, his: 90, civ: 90 },
+    "4": { chi: 80, eng: 85, math: 70, sci: 75, geo: 80, his: 82, civ: 80, schoolRank: 150 }, 
+    "1": { chi: 85, eng: 88, math: 80, sci: 82, geo: 85, his: 85, civ: 85, schoolRank: 120 }, 
+    "2": { chi: 90, eng: 92, math: 95, sci: 90, geo: 90, his: 90, civ: 90, schoolRank: 45 },
   },
   "7-1-reg-1": { 
-    "4": { chi: 85, eng: 90, math: 75, sci: 80, geo: 85, his: 85, civ: 85 }, 
-    "1": { chi: 88, eng: 90, math: 85, sci: 85, geo: 88, his: 88, civ: 88 }, 
-    "2": { chi: 92, eng: 95, math: 98, sci: 92, geo: 92, his: 92, civ: 92 },
+    "4": { chi: 85, eng: 90, math: 75, sci: 80, geo: 85, his: 85, civ: 85, schoolRank: 135 }, 
+    "1": { chi: 88, eng: 90, math: 85, sci: 85, geo: 88, his: 88, civ: 88, schoolRank: 110 }, 
+    "2": { chi: 92, eng: 95, math: 98, sci: 92, geo: 92, his: 92, civ: 92, schoolRank: 30 },
   },
   "7-1-reg-2": { 
-    "4": { chi: 82, eng: 88, math: 72, sci: 78, geo: 82, his: 84, civ: 82 }, 
-    "1": { chi: 86, eng: 89, math: 82, sci: 84, geo: 86, his: 86, civ: 86 }, 
-    "2": { chi: 91, eng: 94, math: 96, sci: 91, geo: 91, his: 91, civ: 91 },
+    "4": { chi: 82, eng: 88, math: 72, sci: 78, geo: 82, his: 84, civ: 82, schoolRank: 140 }, 
+    "1": { chi: 86, eng: 89, math: 82, sci: 84, geo: 86, his: 86, civ: 86, schoolRank: 115 }, 
+    "2": { chi: 91, eng: 94, math: 96, sci: 91, geo: 91, his: 91, civ: 91, schoolRank: 40 },
   }
 };
 
@@ -189,9 +189,8 @@ const ComparisonBar = ({ subject, myScore, avgScore, maxScore = 100, isCap = fal
   );
 };
 
-// 更新 TrendChart 支援反轉 (reverse) 模式，用於排名顯示
 const TrendChart = ({ data, title, reverse = false }) => {
-  if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4 text-center bg-gray-50 rounded-lg">尚無足夠數據繪製趨勢圖 (需至少一次考試成績)</div>;
+  if (!data || data.length === 0) return <div className="text-gray-400 text-sm p-4 text-center bg-gray-50 rounded-lg">尚無足夠數據繪製趨勢圖</div>;
   
   const scores = data.map(d => d.score);
   const maxVal = Math.max(...scores);
@@ -204,11 +203,9 @@ const TrendChart = ({ data, title, reverse = false }) => {
   let maxScore = 100;
 
   if (reverse) {
-    // 排名模式：1 是最好的，放上面
     minScore = 1;
-    maxScore = Math.max(...scores, 5); // 確保圖表不會太扁，至少顯示到第5名或更低
+    maxScore = Math.max(...scores, 10); 
   } else {
-    // 分數模式
     const isRegularTotal = maxVal > 35;
     maxScore = isRegularTotal ? 500 : 35;
     minScore = 0;
@@ -222,10 +219,8 @@ const TrendChart = ({ data, title, reverse = false }) => {
   
   const getY = (val) => {
     if (reverse) {
-        // 反轉模式：值越小 (1) 越靠上 (padding)，值越大 (maxScore) 越靠下
         return padding + ((val - minScore) / (maxScore - minScore)) * (height - 2 * padding);
     } else {
-        // 一般模式：值越大 (maxScore) 越靠上 (padding)
         return height - padding - ((val - minScore) / (maxScore - minScore)) * (height - 2 * padding);
     }
   };
@@ -234,7 +229,7 @@ const TrendChart = ({ data, title, reverse = false }) => {
     ? data.map((d, i) => `${getX(i)},${getY(d.score)}`).join(' ') 
     : "";
 
-  const lineColor = reverse ? "#f59e0b" : "#2563eb"; // 排名用橘色，分數用藍色
+  const lineColor = reverse ? "#f59e0b" : "#2563eb";
 
   return (
     <div className="w-full overflow-x-auto">
@@ -252,7 +247,9 @@ const TrendChart = ({ data, title, reverse = false }) => {
         {data.map((d, i) => (
           <g key={i}>
             <circle cx={getX(i)} cy={getY(d.score)} r="5" fill={lineColor} />
-            <text x={getX(i)} y={getY(d.score) - 10} textAnchor="middle" fontSize="12" fill="#4b5563" fontWeight="bold">{d.score}</text>
+            <text x={getX(i)} y={getY(d.score) - 10} textAnchor="middle" fontSize="12" fill="#4b5563" fontWeight="bold">
+                {d.score}
+            </text>
             <text x={getX(i)} y={height - 5} textAnchor="middle" fontSize="10" fill="#9ca3af">{d.examLabel.split(' ').pop()}</text>
           </g>
         ))}
@@ -286,28 +283,10 @@ export default function App() {
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
-      vercel-live-feedback,
-      #vercel-toolbar,
-      vercel-toolbar,
-      [data-testid="vercel-toolbar"],
-      div[class*="vercel-toolbar"],
-      [class*="vercel-toast"] {
-        display: none !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        visibility: hidden !important;
-        z-index: -9999 !important;
-        width: 0 !important;
-        height: 0 !important;
-        overflow: hidden !important;
-      }
+      vercel-live-feedback, #vercel-toolbar, vercel-toolbar, [data-testid="vercel-toolbar"], div[class*="vercel-toolbar"], [class*="vercel-toast"] { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; z-index: -9999 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; }
     `;
     document.head.appendChild(style);
-    return () => {
-      if (document.head.contains(style)) {
-        document.head.removeChild(style);
-      }
-    };
+    return () => { if (document.head.contains(style)) document.head.removeChild(style); };
   }, []);
 
   // --- Sync Effects ---
@@ -321,23 +300,15 @@ export default function App() {
             studentList.sort((a, b) => a.seat - b.seat);
             setStudents(studentList);
             setConnectionStatus("connected");
-          } else {
-             setConnectionStatus("connected");
-          }
+          } else { setConnectionStatus("connected"); }
         }, (err) => { 
             console.warn("Using Mock Data (Students)", err); 
             setConnectionStatus("error"); 
             setStudents(MOCK_STUDENTS);
         });
         return () => unsub();
-      } catch (e) { 
-          setConnectionStatus("error"); 
-          setStudents(MOCK_STUDENTS);
-      }
-    } else { 
-        setConnectionStatus("demo"); 
-        setStudents(MOCK_STUDENTS);
-    }
+      } catch (e) { setConnectionStatus("error"); setStudents(MOCK_STUDENTS); }
+    } else { setConnectionStatus("demo"); setStudents(MOCK_STUDENTS); }
   }, []);
 
   useEffect(() => {
@@ -346,20 +317,12 @@ export default function App() {
         const unsub = onSnapshot(collection(db, "grades"), (snapshot) => {
           const gradesData = {};
           snapshot.docs.forEach(doc => { gradesData[doc.id] = doc.data(); });
-          if (Object.keys(gradesData).length > 0) {
-            setGradesDB(gradesData);
-          } else {
-             setGradesDB(MOCK_GRADES); 
-          }
-        }, (err) => {
-           console.warn("Using Mock Data (Grades)");
-           setGradesDB(MOCK_GRADES);
-        });
+          if (Object.keys(gradesData).length > 0) setGradesDB(gradesData);
+          else setGradesDB(MOCK_GRADES);
+        }, (err) => { console.warn("Using Mock Data (Grades)"); setGradesDB(MOCK_GRADES); });
         return () => unsub();
       } catch (e) { setGradesDB(MOCK_GRADES); }
-    } else {
-        setGradesDB(MOCK_GRADES);
-    }
+    } else { setGradesDB(MOCK_GRADES); }
   }, []);
 
   useEffect(() => {
@@ -447,7 +410,12 @@ export default function App() {
   const handleGradeChange = async (studentId, subject, value) => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     let finalValue = value;
-    if (currentCategory === 'regular') finalValue = Number(value);
+    // 校排 schoolRank 應該是數字，但允許空字串
+    if (subject === 'schoolRank') {
+       finalValue = value === '' ? '' : Number(value);
+    } else if (currentCategory === 'regular') {
+       finalValue = Number(value);
+    }
     
     if(db && connectionStatus === 'connected') {
         await setDoc(doc(db, "grades", teacherExamId), {
@@ -462,22 +430,18 @@ export default function App() {
   };
   const handleSort = (key) => {
     let direction = 'desc';
-    if (key === 'seat' || key === 'rank') direction = 'asc';
+    if (key === 'seat' || key === 'rank' || key === 'schoolRank') direction = 'asc';
     if (sortConfig.key === key && sortConfig.direction === direction) { direction = direction === 'asc' ? 'desc' : 'asc'; }
     setSortConfig({ key, direction });
   };
   
   // CSV Handlers
   const handleDownloadStudentTemplate = () => {
-    const BOM = "\uFEFF"; 
-    const headers = "座號,姓名,帳號,密碼";
+    const BOM = "\uFEFF"; const headers = "座號,姓名,帳號,密碼";
     const csvContent = BOM + headers + "\n6,範例王小明,s11206,123456\n7,範例林小美,s11207,123456";
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a"); 
-    link.href = url; 
-    link.download = "學生資料匯入範本.csv"; 
-    link.click();
+    const link = document.createElement("a"); link.href = url; link.download = "學生資料匯入範本.csv"; link.click();
     URL.revokeObjectURL(url);
   };
   
@@ -489,12 +453,10 @@ export default function App() {
         const content = e.target.result;
         const lines = content.split(/\r\n|\n/);
         let count = 0;
-        // Parse CSV lines
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           const parts = line.split(',');
-          // Ensure at least 4 columns
           if (parts.length >= 4) {
              const seat = parseInt(parts[0].trim());
              const name = parts[1].trim();
@@ -520,8 +482,9 @@ export default function App() {
   const handleDownloadGradeTemplate = () => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     const BOM = "\uFEFF"; 
-    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民" : "座號,姓名,國文,英語,數學,自然,社會";
-    let example = currentCategory === 'regular' ? "6,王小明,80,85,90,88,85,82,88" : "6,王小明,A++,A,B++,A+,B";
+    // 修改：範本增加校排欄位 (最後一欄)
+    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民,校排" : "座號,姓名,國文,英語,數學,自然,社會,校排";
+    let example = currentCategory === 'regular' ? "6,王小明,80,85,90,88,85,82,88,150" : "6,王小明,A++,A,B++,A+,B,150";
     const csvContent = BOM + headers + "\n" + example;
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -547,19 +510,22 @@ export default function App() {
           const line = lines[i].trim();
           if (!line) continue;
           const parts = line.split(',');
-          // Check format based on category
+          
           const seat = parseInt(parts[0].trim());
           const student = students.find(s => s.seat === seat);
           
           if (student) {
              const scores = {};
+             // 修改：解析最後一欄的校排 (Regular: 索引9, Cap: 索引7)
              if (currentCategory === 'regular' && parts.length >= 9) {
                 scores.chi = Number(parts[2]); scores.eng = Number(parts[3]);
                 scores.math = Number(parts[4]); scores.sci = Number(parts[5]);
                 scores.geo = Number(parts[6]); scores.his = Number(parts[7]); scores.civ = Number(parts[8]);
+                if (parts[9]) scores.schoolRank = Number(parts[9]); // Optional School Rank
              } else if (currentCategory === 'cap' && parts.length >= 7) {
                 scores.chi = parts[2].trim().toUpperCase(); scores.eng = parts[3].trim().toUpperCase();
                 scores.math = parts[4].trim().toUpperCase(); scores.sci = parts[5].trim().toUpperCase(); scores.soc = parts[6].trim().toUpperCase();
+                if (parts[7]) scores.schoolRank = Number(parts[7]); // Optional School Rank
              }
              if (Object.keys(scores).length > 0) {
                updates[student.id] = { ...(gradesDB[teacherExamId]?.[student.id] || {}), ...scores };
@@ -584,10 +550,7 @@ export default function App() {
     const subjects = category === 'regular' 
       ? ['chi', 'eng', 'math', 'sci', 'geo', 'his', 'civ', 'social', 'total'] 
       : ['chi', 'eng', 'math', 'sci', 'soc', 'total'];
-    
-    let sums = {};
-    let counts = {};
-    let passCounts = {};
+    let sums = {}, counts = {}, passCounts = {};
     subjects.forEach(sub => { sums[sub] = 0; counts[sub] = 0; passCounts[sub] = 0; });
 
     studentsData.forEach(student => {
@@ -607,22 +570,17 @@ export default function App() {
         });
       }
     });
-
-    let averages = {};
-    let passRates = {};
+    let averages = {}, passRates = {};
     subjects.forEach(sub => {
       averages[sub] = counts[sub] > 0 ? (sums[sub] / counts[sub]).toFixed(1) : '-';
       passRates[sub] = counts[sub] > 0 ? Math.round((passCounts[sub] / counts[sub]) * 100) : '-';
     });
-
     return { averages, passRates, hasData: counts['total'] > 0 };
   };
 
   const teacherExamStats = useMemo(() => calculateExamStatistics(teacherExamId, students, gradesDB), [teacherExamId, students, gradesDB]);
   const allExamStats = useMemo(() => EXAM_OPTIONS.map(opt => ({ ...opt, ...calculateExamStatistics(opt.id, students, gradesDB) })).filter(e => e.hasData), [students, gradesDB]);
 
-  const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId);
-  
   // --- Data Prep Hooks (Parent) ---
   const currentExamData = useMemo(() => {
     if (!currentUser || userRole !== 'parent') return null;
@@ -641,7 +599,6 @@ export default function App() {
     
     const rank = allStudentStats.indexOf(stats.total) + 1;
     const avgTotal = allStudentStats.length > 0 ? (allStudentStats.reduce((a, b) => a + b, 0) / allStudentStats.length).toFixed(1) : 0;
-    
     const examStats = calculateExamStatistics(parentExamId, students, gradesDB);
 
     return { 
@@ -654,7 +611,6 @@ export default function App() {
     };
   }, [currentUser, parentExamId, gradesDB, students]);
 
-  // 分數走勢
   const trendData = useMemo(() => {
     if (!currentUser || userRole !== 'parent') return [];
     const currentCat = getCurrentExamCategory(parentExamId);
@@ -666,23 +622,19 @@ export default function App() {
     });
   }, [currentUser, gradesDB, parentExamId]);
 
-  // 排名走勢
   const rankTrendData = useMemo(() => {
     if (!currentUser || userRole !== 'parent') return [];
     const currentCat = getCurrentExamCategory(parentExamId);
     const availableExams = EXAM_OPTIONS.filter(opt => gradesDB[opt.id] && gradesDB[opt.id][currentUser.id] && opt.category === currentCat);
-    
     return availableExams.map(opt => {
       const examGrades = gradesDB[opt.id] || {};
       const myStats = calculateStats(examGrades[currentUser.id], opt.category);
       const myTotal = myStats.total;
-
       const allTotals = students.map(s => {
         const sScores = examGrades[s.id];
         if (!sScores) return -1;
         return calculateStats(sScores, opt.category).total;
       }).sort((a, b) => b - a);
-
       const rank = allTotals.indexOf(myTotal) + 1;
       return { examLabel: opt.label, score: rank };
     });
@@ -715,6 +667,7 @@ export default function App() {
     return data;
   }, [students, gradesDB, teacherExamId, sortConfig, userRole]);
 
+  const currentTeacherExamCategory = getCurrentExamCategory(teacherExamId);
 
   // --- Render ---
   if (!isLoggedIn) {
@@ -749,13 +702,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
       <div className="md:hidden bg-blue-600 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
         <span className="font-bold text-lg">{teacherProfile.className} 智慧校園</span>
         <button onClick={() => setShowMenu(!showMenu)}><Menu/></button>
       </div>
 
-      {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 transform ${showMenu ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform w-64 bg-white shadow-lg z-40 flex flex-col print:hidden`}>
         <div className="p-6 border-b">
           <h2 className="text-xl font-bold text-blue-600">{teacherProfile.className} 智慧校園</h2>
@@ -789,7 +740,6 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-            {/* 只有表格，沒有走勢圖 */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -830,7 +780,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ... (Settings, Students tabs - omitted for brevity, using same components) ... */}
+        {/* ... (Settings, Students tabs - same as before) ... */}
         {userRole === 'teacher' && activeTab === 'settings' && (
           <div className="max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Settings className="mr-2 text-blue-600"/> 班級與導師設定</h2>
@@ -883,17 +833,28 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TEACHER: GRADE MANAGEMENT ================= */}
+        {/* ================= TEACHER: GRADE MANAGEMENT (Added School Rank) ================= */}
         {userRole === 'teacher' && activeTab === 'grades' && (
           <div className="w-full space-y-4">
-            {/* Same Grade Management Logic ... */}
             <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 print:hidden">
                <div className="flex items-center space-x-4 w-full md:w-auto">
                  <div className="p-2 bg-blue-100 rounded-lg"><BookOpen className="text-blue-600"/></div>
                  <div className="w-full">
                    <label className="block text-xs text-gray-500 font-bold mb-1">選擇考試場次</label>
-                   <select className="w-full md:w-64 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-blue-500" value={teacherExamId} onChange={(e) => setTeacherExamId(e.target.value)}>
-                     {EXAM_GROUPS.map(group => (<optgroup label={group.label} key={group.label}>{group.options.map(opt => (<option key={opt.id} value={opt.id}>{opt.label.split(' ').pop()} {opt.category === 'cap' ? '(積分)' : ''}</option>))}</optgroup>))}
+                   <select 
+                     className="w-full md:w-64 border border-gray-300 rounded-lg p-2 font-bold text-gray-700 focus:ring-2 focus:ring-blue-500"
+                     value={teacherExamId}
+                     onChange={(e) => setTeacherExamId(e.target.value)}
+                   >
+                     {EXAM_GROUPS.map(group => (
+                        <optgroup label={group.label} key={group.label}>
+                          {group.options.map(opt => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label.split(' ').pop()} {opt.category === 'cap' ? '(積分)' : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                     ))}
                    </select>
                  </div>
                </div>
@@ -933,6 +894,7 @@ export default function App() {
                         </>
                       )}
                       <SortableHeader label="排名" sortKey="rank" className="text-center font-bold text-red-600" sortConfig={sortConfig} onSort={handleSort}/>
+                      <SortableHeader label="校排" sortKey="schoolRank" className="text-center text-purple-600 bg-purple-50/50" sortConfig={sortConfig} onSort={handleSort}/>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -940,6 +902,7 @@ export default function App() {
                       <tr key={student.id} className="hover:bg-gray-50">
                         <td className="p-3 text-center text-gray-600">{student.seat}</td>
                         <td className="p-3 font-medium text-gray-800">{student.name}</td>
+                        {/* Input Fields */}
                         {(currentTeacherExamCategory === 'regular' ? ['chi', 'eng', 'math', 'sci', 'geo', 'his', 'civ'] : ['chi', 'eng', 'math', 'sci', 'soc']).map(sub => (
                           <td key={sub} className="p-1">
                             {currentTeacherExamCategory === 'regular' ? (
@@ -961,46 +924,26 @@ export default function App() {
                            <td className="p-3 text-center font-bold text-blue-700 bg-blue-50/30">{student.total}</td>
                         )}
                         <td className="p-3 text-center font-bold text-red-600">#{student.rank}</td>
+                        {/* School Rank Input */}
+                        <td className="p-1 bg-purple-50/30">
+                            <input 
+                              type="number" 
+                              className="w-full text-center p-1 border border-transparent hover:border-purple-300 focus:border-purple-500 rounded bg-transparent focus:bg-white text-purple-700 font-bold" 
+                              value={student.scores.schoolRank || ''} 
+                              placeholder="-" 
+                              onChange={(e) => handleGradeChange(student.id, 'schoolRank', e.target.value)} 
+                            />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
-                  {/* NEW: Table Footer for Averages */}
-                  <tfoot className="bg-gray-100 font-bold text-gray-700 border-t-2 border-gray-200">
-                     <tr>
-                        <td colSpan="2" className="p-3 text-center">班級平均</td>
-                        {currentTeacherExamCategory === 'regular' ? (
-                          <>
-                            {['chi','eng','math','sci','geo','his','civ','social','total'].map(sub => (
-                              <td key={sub} className="p-3 text-center">{teacherExamStats.averages[sub]}</td>
-                            ))}
-                            <td></td>
-                          </>
-                        ) : (
-                          <>
-                            {['chi','eng','math','sci','soc','total'].map(sub => (
-                              <td key={sub} className="p-3 text-center">{teacherExamStats.averages[sub]}</td>
-                            ))}
-                            <td></td>
-                          </>
-                        )}
-                     </tr>
-                     {currentTeacherExamCategory === 'regular' && (
-                       <tr className="bg-green-50 text-green-800 text-xs">
-                          <td colSpan="2" className="p-2 text-center">及格率 (%)</td>
-                          {['chi','eng','math','sci','geo','his','civ'].map(sub => (
-                              <td key={sub} className="p-2 text-center">{teacherExamStats.passRates[sub]}%</td>
-                          ))}
-                          <td colSpan="3"></td>
-                       </tr>
-                     )}
-                  </tfoot>
                 </table>
               </div>
             </div>
           </div>
         )}
 
-        {/* ================= PARENT: DASHBOARD ================= */}
+        {/* ================= PARENT: DASHBOARD (Updated Summary) ================= */}
         {userRole === 'parent' && activeTab === 'dashboard' && currentExamData && (
           <div className="max-w-4xl mx-auto space-y-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">成績分析總覽</h2>
@@ -1027,9 +970,17 @@ export default function App() {
                   <div className="relative z-10">
                     <p className="text-blue-100 text-sm">{currentExamData.category === 'regular' ? '本次總分' : '會考總積分'}</p>
                     <h3 className="text-5xl font-bold mt-2">{currentExamData.myScores.total}</h3>
-                    <div className="mt-4 flex items-baseline space-x-2">
-                      <span className="bg-white/20 px-3 py-1 rounded-lg text-2xl font-bold">班排 #{currentExamData.rank}</span>
-                      <span className="text-sm text-blue-100">/ {currentExamData.totalStudents} 人</span>
+                    <div className="mt-4 flex items-baseline space-x-4">
+                      <div className="flex items-baseline space-x-1">
+                        <span className="bg-white/20 px-3 py-1 rounded-lg text-2xl font-bold">班排 #{currentExamData.rank}</span>
+                        <span className="text-sm text-blue-100">/ {currentExamData.totalStudents}</span>
+                      </div>
+                      {/* 校排顯示 */}
+                      <div className="flex items-baseline space-x-1">
+                         <span className="bg-purple-500/30 px-3 py-1 rounded-lg text-xl font-bold text-purple-100 border border-purple-400/30">
+                           校排 #{currentExamData.myScores.schoolRank || '-'}
+                         </span>
+                      </div>
                     </div>
                   </div>
                   <TrendingUp className="absolute right-0 bottom-0 text-white opacity-10 w-32 h-32 -mb-4 -mr-4" />
