@@ -90,7 +90,6 @@ const generateExamOptions = () => {
   
   grades.forEach((g, gIdx) => {
     semesters.forEach((s, sIdx) => {
-      // 1. 段考 (Regular) -> 放入 regularOptions
       regularExams.forEach((e, eIdx) => {
         regularOptions.push({
           id: `${gIdx+7}-${sIdx+1}-reg-${eIdx}`, 
@@ -99,8 +98,6 @@ const generateExamOptions = () => {
           group: `【段考】${g} ${s}`
         });
       });
-
-      // 2. 複習考 (Review) -> 放入 otherOptions
       reviewExams.forEach((e, eIdx) => {
         otherOptions.push({
           id: `${gIdx+7}-${sIdx+1}-rev-${eIdx}`, 
@@ -109,8 +106,6 @@ const generateExamOptions = () => {
           group: `【模擬/複習】${g} ${s}`
         });
       });
-
-      // 3. 模擬考 (Mock) -> 放入 otherOptions
       if (g === '九年級') {
         mockExams.forEach((m, mIdx) => {
            otherOptions.push({
@@ -123,7 +118,6 @@ const generateExamOptions = () => {
       }
     });
   });
-  
   return [...regularOptions, ...otherOptions];
 };
 const EXAM_OPTIONS = generateExamOptions();
@@ -211,7 +205,6 @@ const TrendChart = ({ data, title, reverse = false }) => {
 
   if (reverse) {
     minScore = 1;
-    // 校排可能很大，確保 Y 軸最大值能容納
     maxScore = Math.max(...scores, 10); 
   } else {
     const isRegularTotal = maxVal > 35;
@@ -390,12 +383,32 @@ export default function App() {
     else setTeacherProfile(newProfile);
     alert("更新成功");
   };
-  const handleUpdateStudent = async () => { setEditingStudentId(null); };
-  const handleDeleteStudent = async (id) => { /* ... */ };
+  const handleUpdateStudent = async () => {
+    if(db && connectionStatus === 'connected') {
+        if (editingStudentId === 'new') {
+          const newStudentRef = doc(collection(db, "students")); 
+          await setDoc(newStudentRef, { ...tempStudentData, id: newStudentRef.id });
+        } else {
+          await updateDoc(doc(db, "students", editingStudentId), tempStudentData);
+        }
+    } else {
+        if (editingStudentId === 'new') {
+            setStudents([...students, { ...tempStudentData, id: Date.now().toString() }]);
+        } else {
+            setStudents(students.map(s => s.id === editingStudentId ? tempStudentData : s));
+        }
+    }
+    setEditingStudentId(null);
+  };
+  const handleDeleteStudent = async (id) => {
+    if (confirm("確定要刪除這位學生嗎？")) {
+      if(db && connectionStatus === 'connected') await deleteDoc(doc(db, "students", id));
+      else setStudents(students.filter(s => s.id !== id));
+    }
+  };
   const handleGradeChange = async (studentId, subject, value) => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     let finalValue = value;
-    // 校排 schoolRank 應該是數字，但允許空字串
     if (subject === 'schoolRank') {
        finalValue = value === '' ? '' : Number(value);
     } else if (currentCategory === 'regular') {
@@ -419,10 +432,117 @@ export default function App() {
     if (sortConfig.key === key && sortConfig.direction === direction) { direction = direction === 'asc' ? 'desc' : 'asc'; }
     setSortConfig({ key, direction });
   };
-  const handleDownloadStudentTemplate = () => { /* ... */ }; 
-  const handleStudentUpload = () => { /* ... */ };
-  const handleDownloadGradeTemplate = () => { /* ... */ };
-  const handleGradeUpload = () => { /* ... */ };
+  
+  // CSV Handlers
+  const handleDownloadStudentTemplate = () => {
+    const BOM = "\uFEFF"; 
+    const headers = "座號,姓名,帳號,密碼";
+    const csvContent = BOM + headers + "\n6,範例王小明,s11206,123456\n7,範例林小美,s11207,123456";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); 
+    link.href = url; 
+    link.download = "學生資料匯入範本.csv"; 
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  
+  const handleStudentUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const content = e.target.result;
+        const lines = content.split(/\r\n|\n/);
+        let count = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(',');
+          if (parts.length >= 4) {
+             const seat = parseInt(parts[0].trim());
+             const name = parts[1].trim();
+             const account = parts[2].trim();
+             const password = parts[3].trim(); 
+             if (!isNaN(seat) && name && account) {
+               if(db && connectionStatus === 'connected') {
+                 const newStudentRef = doc(collection(db, "students"));
+                 await setDoc(newStudentRef, { id: newStudentRef.id, seat, name, account, password: password || "123" });
+               } else {
+                 setStudents(prev => [...prev, { id: Date.now() + Math.random(), seat, name, account, password: password || "123" }]);
+               }
+               count++;
+             }
+          }
+        }
+        if (count > 0) alert(`成功匯入 ${count} 筆學生資料！`);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; 
+  };
+
+  const handleDownloadGradeTemplate = () => {
+    const currentCategory = getCurrentExamCategory(teacherExamId);
+    const BOM = "\uFEFF"; 
+    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民,校排" : "座號,姓名,國文,英語,數學,自然,社會,校排";
+    let example = currentCategory === 'regular' ? "6,王小明,80,85,90,88,85,82,88,150" : "6,王小明,A++,A,B++,A+,B,150";
+    const csvContent = BOM + headers + "\n" + example;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); 
+    link.href = url; 
+    link.download = `${currentCategory==='regular'?'段考':'模考'}_成績匯入範本.csv`; 
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGradeUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const currentCategory = getCurrentExamCategory(teacherExamId);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const content = e.target.result;
+        const lines = content.split(/\r\n|\n/);
+        const updates = {};
+        let count = 0;
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(',');
+          
+          const seat = parseInt(parts[0].trim());
+          const student = students.find(s => s.seat === seat);
+          
+          if (student) {
+             const scores = {};
+             // Regular: 索引9=校排, Cap: 索引7=校排
+             if (currentCategory === 'regular' && parts.length >= 9) {
+                scores.chi = Number(parts[2]); scores.eng = Number(parts[3]);
+                scores.math = Number(parts[4]); scores.sci = Number(parts[5]);
+                scores.geo = Number(parts[6]); scores.his = Number(parts[7]); scores.civ = Number(parts[8]);
+                if (parts[9]) scores.schoolRank = Number(parts[9]);
+             } else if (currentCategory === 'cap' && parts.length >= 7) {
+                scores.chi = parts[2].trim().toUpperCase(); scores.eng = parts[3].trim().toUpperCase();
+                scores.math = parts[4].trim().toUpperCase(); scores.sci = parts[5].trim().toUpperCase(); scores.soc = parts[6].trim().toUpperCase();
+                if (parts[7]) scores.schoolRank = Number(parts[7]);
+             }
+             if (Object.keys(scores).length > 0) {
+               updates[student.id] = { ...(gradesDB[teacherExamId]?.[student.id] || {}), ...scores };
+               count++;
+             }
+          }
+        }
+        if (count > 0) {
+           if(db && connectionStatus === 'connected') await setDoc(doc(db, "grades", teacherExamId), updates, { merge: true });
+           else setGradesDB(prev => ({ ...prev, [teacherExamId]: { ...prev[teacherExamId], ...updates } }));
+           alert(`成功匯入 ${count} 筆成績！`);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; 
+  };
 
   // --- Statistics Logic ---
   const calculateExamStatistics = (examId, studentsData, gradesData) => {
@@ -468,7 +588,6 @@ export default function App() {
     const examGrades = gradesDB[parentExamId] || {};
     const myScores = examGrades[currentUser.id] || {}; 
     const stats = calculateStats(myScores, category);
-    
     if(!Array.isArray(students)) return null;
     const allStudentStats = students.map(s => {
       const scores = examGrades[s.id];
@@ -478,7 +597,6 @@ export default function App() {
     const rank = allStudentStats.indexOf(stats.total) + 1;
     const avgTotal = allStudentStats.length > 0 ? (allStudentStats.reduce((a, b) => a + b, 0) / allStudentStats.length).toFixed(1) : 0;
     const examStats = calculateExamStatistics(parentExamId, students, gradesDB);
-
     return { myScores: { ...myScores, ...stats }, rank, totalStudents: students.length, avgTotal, classAvgs: examStats.averages, category };
   }, [currentUser, parentExamId, gradesDB, students]);
 
@@ -493,21 +611,17 @@ export default function App() {
     });
   }, [currentUser, gradesDB, parentExamId]);
 
-  // 新增：校排走勢 (School Rank Trend)
   const schoolRankTrendData = useMemo(() => {
     if (!currentUser || userRole !== 'parent') return [];
     const currentCat = getCurrentExamCategory(parentExamId);
     const availableExams = EXAM_OPTIONS.filter(opt => gradesDB[opt.id] && gradesDB[opt.id][currentUser.id] && opt.category === currentCat);
-    
     return availableExams.map(opt => {
       const myScores = gradesDB[opt.id]?.[currentUser.id] || {};
-      // 如果老師有輸入 schoolRank 就顯示，否則為 null (null 會在圖表中被忽略或斷開)
       const rank = myScores.schoolRank ? Number(myScores.schoolRank) : null;
       return { examLabel: opt.label, score: rank };
-    }).filter(item => item.score !== null); // 只顯示有校排的資料點
+    }).filter(item => item.score !== null);
   }, [currentUser, gradesDB, parentExamId]);
 
-  // 新增：班排走勢 (Class Rank Trend) - 重用之前的邏輯
   const rankTrendData = useMemo(() => {
     if (!currentUser || userRole !== 'parent') return [];
     const currentCat = getCurrentExamCategory(parentExamId);
@@ -575,7 +689,6 @@ export default function App() {
              <div><label className="text-sm text-gray-700">密碼 {userRole==='parent' && <span className="text-xs text-gray-400">(身分證後4碼)</span>}</label><input name="password" type="password" className="w-full border p-3 rounded-lg" placeholder="請輸入密碼"/></div>
              <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700">登入</button>
            </form>
-           {/* 在模擬模式或資料庫為空時顯示初始化按鈕 */}
            {(connectionStatus === 'demo' || (connectionStatus === 'connected' && students.length === 0 && students !== MOCK_STUDENTS)) && (
             <div className="mt-6 pt-6 border-t border-gray-100">
                <button onClick={initializeDatabase} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg text-sm flex items-center justify-center"><Database size={16} className="mr-2"/> 初始化測試資料 (寫入 Firebase)</button>
@@ -585,27 +698,14 @@ export default function App() {
       </div>
     );
   }
-  
-  // Create grouped options for the select input
-  const EXAM_GROUPS = EXAM_OPTIONS.reduce((groups, opt) => {
-    const lastGroup = groups[groups.length - 1];
-    if (lastGroup && lastGroup.label === opt.group) {
-      lastGroup.options.push(opt);
-    } else {
-      groups.push({ label: opt.group, options: [opt] });
-    }
-    return groups;
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row">
-      {/* Mobile Header */}
       <div className="md:hidden bg-blue-600 text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
         <span className="font-bold text-lg">{teacherProfile.className} 智慧校園</span>
         <button onClick={() => setShowMenu(!showMenu)}><Menu/></button>
       </div>
 
-      {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 transform ${showMenu ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform w-64 bg-white shadow-lg z-40 flex flex-col print:hidden`}>
         <div className="p-6 border-b">
           <h2 className="text-xl font-bold text-blue-600">{teacherProfile.className} 智慧校園</h2>
@@ -639,7 +739,6 @@ export default function App() {
               <LineChart className="mr-2 text-blue-600"/> 
               班級各次段考平均與統計
             </h2>
-            {/* Statistics Table Only (No Trend Chart) */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                <div className="p-4 bg-gray-50 border-b border-gray-100 font-bold text-gray-700">各次考試詳細平均數據</div>
                <div className="overflow-x-auto">
@@ -680,7 +779,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ... (Settings, Students tabs - omitted for brevity) ... */}
+        {/* ... (Settings Tab) ... */}
         {userRole === 'teacher' && activeTab === 'settings' && (
           <div className="max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Settings className="mr-2 text-blue-600"/> 班級與導師設定</h2>
@@ -698,7 +797,7 @@ export default function App() {
           <div className="max-w-5xl mx-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center"><Users className="mr-2 text-blue-600"/> 學生資料與帳號管理</h2>
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+               <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
                 <span className="font-bold text-gray-700">學生列表 ({students.length}人)</span>
                 <div className="flex gap-2">
                    <button onClick={handleDownloadStudentTemplate} className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-sm flex items-center hover:bg-gray-200"><Download size={16} className="mr-1"/> 下載範本</button>
