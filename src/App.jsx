@@ -90,6 +90,7 @@ const generateExamOptions = () => {
   
   grades.forEach((g, gIdx) => {
     semesters.forEach((s, sIdx) => {
+      // 1. 段考 (Regular) -> 放入 regularOptions
       regularExams.forEach((e, eIdx) => {
         regularOptions.push({
           id: `${gIdx+7}-${sIdx+1}-reg-${eIdx}`, 
@@ -98,6 +99,8 @@ const generateExamOptions = () => {
           group: `【段考】${g} ${s}`
         });
       });
+
+      // 2. 複習考 (Review) -> 放入 otherOptions
       reviewExams.forEach((e, eIdx) => {
         otherOptions.push({
           id: `${gIdx+7}-${sIdx+1}-rev-${eIdx}`, 
@@ -106,6 +109,8 @@ const generateExamOptions = () => {
           group: `【模擬/複習】${g} ${s}`
         });
       });
+
+      // 3. 模擬考 (Mock) -> 放入 otherOptions
       if (g === '九年級') {
         mockExams.forEach((m, mIdx) => {
            otherOptions.push({
@@ -287,7 +292,11 @@ export default function App() {
       vercel-live-feedback, #vercel-toolbar, vercel-toolbar, [data-testid="vercel-toolbar"], div[class*="vercel-toolbar"], [class*="vercel-toast"] { display: none !important; opacity: 0 !important; pointer-events: none !important; visibility: hidden !important; z-index: -9999 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; }
     `;
     document.head.appendChild(style);
-    return () => { if (document.head.contains(style)) document.head.removeChild(style); };
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
   }, []);
 
   // --- Sync Effects ---
@@ -301,15 +310,23 @@ export default function App() {
             studentList.sort((a, b) => a.seat - b.seat);
             setStudents(studentList);
             setConnectionStatus("connected");
-          } else { setConnectionStatus("connected"); }
+          } else {
+             setConnectionStatus("connected");
+          }
         }, (err) => { 
             console.warn("Using Mock Data (Students)", err); 
             setConnectionStatus("error"); 
             setStudents(MOCK_STUDENTS);
         });
         return () => unsub();
-      } catch (e) { setConnectionStatus("error"); setStudents(MOCK_STUDENTS); }
-    } else { setConnectionStatus("demo"); setStudents(MOCK_STUDENTS); }
+      } catch (e) { 
+          setConnectionStatus("error"); 
+          setStudents(MOCK_STUDENTS);
+      }
+    } else { 
+        setConnectionStatus("demo"); 
+        setStudents(MOCK_STUDENTS);
+    }
   }, []);
 
   useEffect(() => {
@@ -318,12 +335,20 @@ export default function App() {
         const unsub = onSnapshot(collection(db, "grades"), (snapshot) => {
           const gradesData = {};
           snapshot.docs.forEach(doc => { gradesData[doc.id] = doc.data(); });
-          if (Object.keys(gradesData).length > 0) setGradesDB(gradesData);
-          else setGradesDB(MOCK_GRADES);
-        }, (err) => { console.warn("Using Mock Data (Grades)"); setGradesDB(MOCK_GRADES); });
+          if (Object.keys(gradesData).length > 0) {
+            setGradesDB(gradesData);
+          } else {
+             setGradesDB(MOCK_GRADES); 
+          }
+        }, (err) => {
+           console.warn("Using Mock Data (Grades)");
+           setGradesDB(MOCK_GRADES);
+        });
         return () => unsub();
       } catch (e) { setGradesDB(MOCK_GRADES); }
-    } else { setGradesDB(MOCK_GRADES); }
+    } else {
+        setGradesDB(MOCK_GRADES);
+    }
   }, []);
 
   useEffect(() => {
@@ -355,6 +380,7 @@ export default function App() {
     if (role === 'teacher') {
       const isDefaultLogin = (allowDefault && account === DEFAULT_TEACHER.account && password === DEFAULT_TEACHER.password);
       const isProfileLogin = (account === teacherProfile.account && password === teacherProfile.password);
+
       if (isDefaultLogin || isProfileLogin) {
         setUserRole('teacher');
         setCurrentUser(isDefaultLogin ? DEFAULT_TEACHER : teacherProfile);
@@ -375,6 +401,7 @@ export default function App() {
     }
   };
 
+  // Teacher Handlers
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
@@ -383,8 +410,29 @@ export default function App() {
     else setTeacherProfile(newProfile);
     alert("更新成功");
   };
-  const handleUpdateStudent = async () => { setEditingStudentId(null); };
-  const handleDeleteStudent = async (id) => { /* ... */ };
+  const handleUpdateStudent = async () => {
+    if(db && connectionStatus === 'connected') {
+        if (editingStudentId === 'new') {
+          const newStudentRef = doc(collection(db, "students")); 
+          await setDoc(newStudentRef, { ...tempStudentData, id: newStudentRef.id });
+        } else {
+          await updateDoc(doc(db, "students", editingStudentId), tempStudentData);
+        }
+    } else {
+        if (editingStudentId === 'new') {
+            setStudents([...students, { ...tempStudentData, id: Date.now().toString() }]);
+        } else {
+            setStudents(students.map(s => s.id === editingStudentId ? tempStudentData : s));
+        }
+    }
+    setEditingStudentId(null);
+  };
+  const handleDeleteStudent = async (id) => {
+    if (confirm("確定要刪除這位學生嗎？")) {
+      if(db && connectionStatus === 'connected') await deleteDoc(doc(db, "students", id));
+      else setStudents(students.filter(s => s.id !== id));
+    }
+  };
   const handleGradeChange = async (studentId, subject, value) => {
     const currentCategory = getCurrentExamCategory(teacherExamId);
     let finalValue = value;
@@ -411,10 +459,119 @@ export default function App() {
     if (sortConfig.key === key && sortConfig.direction === direction) { direction = direction === 'asc' ? 'desc' : 'asc'; }
     setSortConfig({ key, direction });
   };
-  const handleDownloadStudentTemplate = () => { /* ... */ }; 
-  const handleStudentUpload = () => { /* ... */ };
-  const handleDownloadGradeTemplate = () => { /* ... */ };
-  const handleGradeUpload = () => { /* ... */ };
+  
+  // CSV Handlers (Restored)
+  const handleDownloadStudentTemplate = () => {
+    const BOM = "\uFEFF"; 
+    const headers = "座號,姓名,帳號,密碼";
+    const csvContent = BOM + headers + "\n6,範例王小明,s11206,123456\n7,範例林小美,s11207,123456";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); 
+    link.href = url; 
+    link.download = "學生資料匯入範本.csv"; 
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  
+  const handleStudentUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const content = e.target.result;
+        const lines = content.split(/\r\n|\n/);
+        let count = 0;
+        // Parse CSV lines
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(',');
+          // Ensure at least 4 columns
+          if (parts.length >= 4) {
+             const seat = parseInt(parts[0].trim());
+             const name = parts[1].trim();
+             const account = parts[2].trim();
+             const password = parts[3].trim(); 
+             if (!isNaN(seat) && name && account) {
+               if(db && connectionStatus === 'connected') {
+                 const newStudentRef = doc(collection(db, "students"));
+                 await setDoc(newStudentRef, { id: newStudentRef.id, seat, name, account, password: password || "123" });
+               } else {
+                 setStudents(prev => [...prev, { id: Date.now() + Math.random(), seat, name, account, password: password || "123" }]);
+               }
+               count++;
+             }
+          }
+        }
+        if (count > 0) alert(`成功匯入 ${count} 筆學生資料！`);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; 
+  };
+
+  const handleDownloadGradeTemplate = () => {
+    const currentCategory = getCurrentExamCategory(teacherExamId);
+    const BOM = "\uFEFF"; 
+    let headers = currentCategory === 'regular' ? "座號,姓名,國文,英語,數學,自然,地理,歷史,公民,校排" : "座號,姓名,國文,英語,數學,自然,社會,校排";
+    let example = currentCategory === 'regular' ? "6,王小明,80,85,90,88,85,82,88,150" : "6,王小明,A++,A,B++,A+,B,150";
+    const csvContent = BOM + headers + "\n" + example;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a"); 
+    link.href = url; 
+    link.download = `${currentCategory==='regular'?'段考':'模考'}_成績匯入範本.csv`; 
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGradeUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const currentCategory = getCurrentExamCategory(teacherExamId);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        const content = e.target.result;
+        const lines = content.split(/\r\n|\n/);
+        const updates = {};
+        let count = 0;
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(',');
+          
+          const seat = parseInt(parts[0].trim());
+          const student = students.find(s => s.seat === seat);
+          
+          if (student) {
+             const scores = {};
+             // Regular: 索引9=校排, Cap: 索引7=校排
+             if (currentCategory === 'regular' && parts.length >= 9) {
+                scores.chi = Number(parts[2]); scores.eng = Number(parts[3]);
+                scores.math = Number(parts[4]); scores.sci = Number(parts[5]);
+                scores.geo = Number(parts[6]); scores.his = Number(parts[7]); scores.civ = Number(parts[8]);
+                if (parts[9]) scores.schoolRank = Number(parts[9]);
+             } else if (currentCategory === 'cap' && parts.length >= 7) {
+                scores.chi = parts[2].trim().toUpperCase(); scores.eng = parts[3].trim().toUpperCase();
+                scores.math = parts[4].trim().toUpperCase(); scores.sci = parts[5].trim().toUpperCase(); scores.soc = parts[6].trim().toUpperCase();
+                if (parts[7]) scores.schoolRank = Number(parts[7]);
+             }
+             if (Object.keys(scores).length > 0) {
+               updates[student.id] = { ...(gradesDB[teacherExamId]?.[student.id] || {}), ...scores };
+               count++;
+             }
+          }
+        }
+        if (count > 0) {
+           if(db && connectionStatus === 'connected') await setDoc(doc(db, "grades", teacherExamId), updates, { merge: true });
+           else setGradesDB(prev => ({ ...prev, [teacherExamId]: { ...prev[teacherExamId], ...updates } }));
+           alert(`成功匯入 ${count} 筆成績！`);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; 
+  };
 
   // --- Statistics Logic ---
   const calculateExamStatistics = (examId, studentsData, gradesData) => {
@@ -425,6 +582,7 @@ export default function App() {
       : ['chi', 'eng', 'math', 'sci', 'soc', 'total'];
     let sums = {}, counts = {}, passCounts = {};
     subjects.forEach(sub => { sums[sub] = 0; counts[sub] = 0; passCounts[sub] = 0; });
+
     studentsData.forEach(student => {
       const sGrades = examGrades[student.id];
       if (sGrades) {
@@ -442,11 +600,14 @@ export default function App() {
         });
       }
     });
-    let averages = {}, passRates = {};
+
+    let averages = {};
+    let passRates = {};
     subjects.forEach(sub => {
       averages[sub] = counts[sub] > 0 ? (sums[sub] / counts[sub]).toFixed(1) : '-';
       passRates[sub] = counts[sub] > 0 ? Math.round((passCounts[sub] / counts[sub]) * 100) : '-';
     });
+
     return { averages, passRates, hasData: counts['total'] > 0 };
   };
 
@@ -468,10 +629,19 @@ export default function App() {
       if (!scores) return null;
       return calculateStats(scores, category).total;
     }).filter(t => t !== null).sort((a, b) => b - a);
+    
     const rank = allStudentStats.indexOf(stats.total) + 1;
     const avgTotal = allStudentStats.length > 0 ? (allStudentStats.reduce((a, b) => a + b, 0) / allStudentStats.length).toFixed(1) : 0;
     const examStats = calculateExamStatistics(parentExamId, students, gradesDB);
-    return { myScores: { ...myScores, ...stats }, rank, totalStudents: students.length, avgTotal, classAvgs: examStats.averages, category };
+
+    return { 
+      myScores: { ...myScores, ...stats }, 
+      rank, 
+      totalStudents: students.length, 
+      avgTotal, 
+      classAvgs: examStats.averages, 
+      category 
+    };
   }, [currentUser, parentExamId, gradesDB, students]);
 
   const trendData = useMemo(() => {
