@@ -879,16 +879,37 @@ export default function App() {
                       <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.name} onChange={e => setTempStudentData({...tempStudentData, name: e.target.value})}/></td>
                       <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.account} onChange={e => setTempStudentData({...tempStudentData, account: e.target.value})}/></td>
                       <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.password} onChange={e => setTempStudentData({...tempStudentData, password: e.target.value})}/></td>
-                      <td className="p-4 text-center"><button onClick={handleUpdateStudent} className="text-green-600 mr-2"><Save size={18}/></button></td>
+                      <td className="p-4 text-center flex justify-center space-x-3">
+                        <button onClick={handleUpdateStudent} className="text-green-600 hover:text-green-700"><Save size={18}/></button>
+                        <button onClick={() => setEditingStudentId(null)} className="text-gray-500 hover:text-gray-700"><XCircle size={18}/></button>
+                      </td>
                     </tr>
                   )}
                   {students.map(student => (
                     <tr key={student.id} className="hover:bg-gray-50">
-                       <td className="p-4">{student.seat}</td>
-                       <td className="p-4 font-bold text-gray-700">{student.name}</td>
-                       <td className="p-4 text-gray-500">{student.account}</td>
-                       <td className="p-4 font-mono text-gray-400">••••••</td>
-                       <td className="p-4 text-center"><button onClick={() => { setEditingStudentId(student.id); setTempStudentData(student); }} className="text-blue-500 hover:text-blue-700"><Edit size={18}/></button></td>
+                      {editingStudentId === student.id ? (
+                        <>
+                          <td className="p-4"><input className="w-16 border rounded p-1" value={tempStudentData.seat} onChange={e => setTempStudentData({...tempStudentData, seat: Number(e.target.value)})}/></td>
+                          <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.name} onChange={e => setTempStudentData({...tempStudentData, name: e.target.value})}/></td>
+                          <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.account} onChange={e => setTempStudentData({...tempStudentData, account: e.target.value})}/></td>
+                          <td className="p-4"><input className="w-32 border rounded p-1" value={tempStudentData.password} onChange={e => setTempStudentData({...tempStudentData, password: e.target.value})}/></td>
+                          <td className="p-4 text-center flex justify-center space-x-3">
+                            <button onClick={handleUpdateStudent} className="text-green-600 hover:text-green-700"><Save size={18}/></button>
+                            <button onClick={() => setEditingStudentId(null)} className="text-gray-500 hover:text-gray-700"><XCircle size={18}/></button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-4">{student.seat}</td>
+                          <td className="p-4 font-bold text-gray-700">{student.name}</td>
+                          <td className="p-4 text-gray-500">{student.account}</td>
+                          <td className="p-4 font-mono text-gray-400">••••••</td>
+                          <td className="p-4 text-center flex justify-center space-x-3">
+                            <button onClick={() => { setEditingStudentId(student.id); setTempStudentData(student); }} className="text-blue-500 hover:text-blue-700"><Edit size={18}/></button>
+                            <button onClick={() => handleDeleteStudent(student.id)} className="text-red-500 hover:text-red-700"><Trash2 size={18}/></button>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
