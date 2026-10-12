@@ -69,7 +69,7 @@ const MOCK_GRADES = {
 const DEFAULT_TEACHER = { 
   id: 'teacher', 
   name: '黃翰強', 
-  className: '三年2班', 
+  className: '二年2班', 
   account: 't888', 
   password: '888' 
 };
